@@ -1,0 +1,263 @@
+/* =============================================================================
+   本地工具箱 · 设计系统 v7
+   依据 taste-skill + impeccable 设计原则重构：
+   - 品牌紫（用户指定 #562AFF / #7C5DFF）走 skill 的"品牌色 override"路径，克制成体系
+   - 中性色全部向品牌紫相倾斜（微 chroma），杜绝纯黑 #000 / 纯白 #fff 基底
+   - 60-30-10 权重：主色只用于 CTA / 激活 / 焦点，不做大面积铺色
+   - 4pt 语义间距 token、单一圆角体系、motion 统一缓动、数字等宽
+   - 只动 transform/opacity；尊重 prefers-reduced-motion
+   ===========================================================================*/
+:root {
+  /* ================= 背景层级（浅色，紫倾向中性） ================= */
+  --bg: #F7F7FC;
+  --bg-elevated: #FDFDFF;
+  --sidebar-bg: #FDFDFF;
+  --surface: #FFFFFF;
+  --surface-hover: #F3F2FA;
+  --input-bg: #FFFFFF;
+  --border: #E8E8F1;
+  --border-strong: #D6D6E4;
+
+  /* ================= 文字层级 ================= */
+  --text: #1B1B29;
+  --text-body: #41414F;
+  --text-muted: #717186;
+  --text-dim: #A9A9BB;
+
+  /* ================= 品牌紫（60-30-10 中的 10） ================= */
+  --primary: #562AFF;
+  --primary-hover: #4618F2;
+  --primary-soft: rgba(86, 42, 255, 0.10);
+  --primary-grad: linear-gradient(135deg, #6B4CFF 0%, #4E27EC 100%);
+  --accent: #562AFF;
+  --accent-soft: rgba(86, 42, 255, 0.10);
+
+  /* 功能色：单一 accent 体系内，仅语义用途 */
+  --ok: #1B8A5F;
+  --ok-soft: rgba(27, 138, 95, 0.11);
+  --warn: #B07506;
+  --warn-soft: rgba(176, 117, 6, 0.12);
+  --danger: #D93A3A;
+  --danger-hover: #B3261E;
+  --danger-soft: rgba(217, 58, 58, 0.10);
+  --info: #562AFF;
+  --info-soft: rgba(86, 42, 255, 0.10);
+
+  /* ---- 辅助（品牌紫扩展） ---- */
+  --purple-3: #9288FF;
+  --purple-4: #7669FF;
+  --toast-info-bg: #EEECFF;
+  --toast-info-border: #D5CFFF;
+  --user-msg-bg: #ECEEFB;
+  --chat-bg: #F1F1F8;
+
+  /* ================= 字体 ================= */
+  --font-ui: "Segoe UI", "Microsoft YaHei", "微软雅黑", system-ui, sans-serif;
+  --font-mono: "Consolas", "Cascadia Mono", "Courier New", monospace;
+  --fw-regular: 400;
+  --fw-medium: 550;
+  --fw-semibold: 650;
+  --fw-bold: 750;
+
+  /* ================= 间距（4pt 语义刻度） ================= */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* ================= 圆角（单一体系：输入 8 / 控件 10 / 卡片 12 / 胶囊 999） ================= */
+  --radius-sm: 8px;
+  --radius: 10px;
+  --radius-lg: 12px;
+  --radius-full: 999px;
+
+  /* ================= 动效（统一缓动，只动 transform/opacity） ================= */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 0.14s;
+  --dur-med: 0.22s;
+  --dur-slow: 0.34s;
+
+  /* ================= 尺寸 ================= */
+  --topbar-h: 48px;
+  --statusbar-h: 30px;
+  --sidebar-w: 204px;
+  --content-pad: 24px;
+
+  /* ================= 阴影（带紫倾向、无纯黑） ================= */
+  --shadow-sm: 0 1px 2px rgba(35, 30, 70, 0.06);
+  --shadow: 0 4px 16px rgba(35, 30, 70, 0.09);
+  --shadow-lg: 0 14px 40px rgba(35, 30, 70, 0.16);
+  --scroll-thumb: #D2D2E0;
+  --scroll-track: transparent;
+}
+
+[data-theme="dark"] {
+  /* ================= 背景层级（暗色，紫倾向深灰，非纯黑） ================= */
+  --bg: #0D0D13;
+  --bg-elevated: #12121A;
+  --sidebar-bg: #101018;
+  --surface: #17171F;
+  --surface-hover: #20202B;
+  --input-bg: #17171F;
+  --border: #2A2A38;
+  --border-strong: #3A3A4C;
+
+  /* ================= 文字层级 ================= */
+  --text: #F5F5FA;
+  --text-body: #D3D3DE;
+  --text-muted: #A0A0B3;
+  --text-dim: #6E6E82;
+
+  /* ================= 品牌紫（暗色提亮） ================= */
+  --primary: #8A6CFF;
+  --primary-hover: #9E86FF;
+  --primary-soft: rgba(138, 108, 255, 0.17);
+  --primary-grad: linear-gradient(135deg, #7D63FF 0%, #5A3BEA 100%);
+  --accent: #8A6CFF;
+  --accent-soft: rgba(138, 108, 255, 0.17);
+
+  --ok: #4ED9A0;
+  --ok-soft: rgba(78, 217, 160, 0.15);
+  --warn: #F0BE4E;
+  --warn-soft: rgba(240, 190, 78, 0.15);
+  --danger: #F47070;
+  --danger-hover: #F8A3A3;
+  --danger-soft: rgba(244, 112, 112, 0.15);
+  --info: #8A6CFF;
+  --info-soft: rgba(138, 108, 255, 0.17);
+
+  --purple-3: #A29BFF;
+  --purple-4: #8878FF;
+  --toast-info-bg: rgba(138, 108, 255, 0.18);
+  --toast-info-border: rgba(138, 108, 255, 0.36);
+  --user-msg-bg: #23232F;
+  --chat-bg: #13131B;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 14px 40px rgba(0, 0, 0, 0.6);
+  --scroll-thumb: #3A3A4C;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+
+body {
+  font-family: var(--font-ui);
+  background: var(--bg);
+  color: var(--text-body);
+  font-size: 13px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+  transition: background var(--dur-med) ease, color var(--dur-med) ease;
+}
+
+/* 标题：用字重与字阶做层级，不做渐变/纯色堆叠 */
+h1, h2, h3, h4 { margin: 0; color: var(--text); letter-spacing: -0.01em; font-weight: var(--fw-semibold); }
+
+a { color: var(--primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.muted { color: var(--text-muted); }
+.dim { color: var(--text-dim); }
+.mono { font-family: var(--font-mono); }
+
+/* 数字一律等宽 + tabular，扫描跳动不晃屏 */
+.num, .stat-num, .size, .bytes {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+::selection { background: var(--primary-soft); }
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+
+/* 滚动条 */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--scroll-track); }
+::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-strong); background-clip: content-box; border: 3px solid transparent; }
+
+/* ---------------------------------------------------------------------------
+   动效基础：入场 / 骨架 / 物理反馈
+   ---------------------------------------------------------------------------*/
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(260%); }
+}
+@keyframes spinnerRotate { to { transform: rotate(360deg); } }
+
+.animate-in { animation: fadeIn var(--dur-med) var(--ease-out) both; }
+.scan-target-wrap { position: relative; }
+.empty-state { text-align: center; padding: 48px 20px; color: var(--text-muted); }
+
+/* 空状态图标 */
+.empty-state .es-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 56px; height: 56px; border-radius: var(--radius-lg);
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text-dim); margin-bottom: 14px;
+}
+.empty-state h3 { margin-bottom: 6px; }
+.empty-state p { margin: 0 0 18px; font-size: 13px; max-width: 46ch; margin-inline: auto; }
+
+/* 骨架屏：加载时贴合最终布局形状，替代转圈 */
+.skeleton {
+  position: relative; overflow: hidden; border-radius: var(--radius-sm);
+  background: var(--surface-hover);
+}
+.skeleton::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  animation: shimmer 1.4s infinite;
+}
+[data-theme="dark"] .skeleton::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.07), transparent);
+}
+.skeleton-row { height: 14px; margin: 10px 0; }
+
+/* 物理按压反馈：所有可点控件按下时轻微下沉 */
+.btn:active:not(:disabled),
+.icon-btn:active:not(:disabled),
+.side-item:active:not(:disabled),
+.tool-tab:active:not(:disabled),
+.switch:active .knob,
+.mtool-card:active:not(:disabled) { transform: scale(0.975); }
+
+/* 进度条 */
+.progress-bar { position: relative; overflow: hidden; height: 5px; border-radius: 999px; background: var(--input-bg); }
+.progress-bar > i {
+  position: absolute; inset: 0; border-radius: inherit;
+  background: var(--primary-grad);
+  box-shadow: 0 0 10px var(--primary-soft);
+  transition: width 0.28s var(--ease-out);
+}
+.progress-label { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
+
+/* ---------------------------------------------------------------------------
+   Reduced Motion：所有非必要动效在此降级为静态
+   ---------------------------------------------------------------------------*/
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .btn:active:not(:disabled),
+  .icon-btn:active:not(:disabled),
+  .side-item:active:not(:disabled),
+  .tool-tab:active:not(:disabled) { transform: none; }
+}

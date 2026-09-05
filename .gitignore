@@ -1,0 +1,41 @@
+node_modules/
+dist/
+backend_dist/
+.venv/
+__pycache__/
+*.pyc
+tests_tmp/
+.env
+# 签名证书/密钥（永不入库）
+build/certs/*.pfx
+build/certs/*.p12
+*.pfx
+*.p12
+.env
+
+.env.azure
+build/azure-config.json
+
+# 构建产物 / 安装包（安装包通过 GitHub Releases 分发，不入 git 库）
+release/
+*.exe
+*.blockmap
+*.db
+*.db-wal
+*.db-shm
+build/pyinstaller/
+
+# 测试临时目录 / 缓存
+tests_tmp_*/
+.pytest_cache/
+backend/tests/__pycache__/
+
+# 参考素材（历史 portal 快照，不入库）
+meoo_portal/
+meoo-1103.png
+meoo-*.png
+
+# 系统 / 编辑器
+.DS_Store
+Thumbs.db
+*.log

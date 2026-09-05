@@ -1,0 +1,104 @@
+{
+  "name": "disk-cleanup-assistant",
+  "productName": "本地工具箱",
+  "version": "0.1.0",
+  "description": "Windows 磁盘清理助手（Electron + FastAPI）",
+  "author": "local-tools",
+  "private": true,
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "concurrently -k \"vite\" \"cross-env ELECTRON_START_URL=http://127.0.0.1:5173 electron .\"",
+    "start": "electron .",
+    "dev:renderer": "vite",
+    "typecheck": "tsc --noEmit",
+    "build:renderer": "tsc --noEmit && vite build",
+    "build:backend": "powershell -ExecutionPolicy Bypass -File scripts\\build_backend.ps1",
+    "dist": "npm run build:renderer && npm run build:backend && electron-builder --win nsis",
+    "sign": "powershell -ExecutionPolicy Bypass -File scripts\\sign.ps1",
+    "gen:dev-cert": "powershell -ExecutionPolicy Bypass -File scripts\\generate_dev_cert.ps1",
+    "dist:azure": "npm run build:renderer && npm run build:backend && node scripts/prepare-azure-config.mjs && electron-builder --win nsis --config build/azure-config.json",
+    "verify:azure-env": "node scripts/prepare-azure-config.mjs",
+    "test:backend": "cd backend && python -m pytest -q"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.0.1",
+    "cross-env": "^7.0.3",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.1"
+  },
+  "build": {
+    "appId": "com.localtools.diskcleanup",
+    "productName": "本地工具箱",
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "backend/**/*",
+      "scripts/**/*",
+      "package.json",
+      "build/icons/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "backend_dist/disk_cleanup_backend.exe",
+        "to": "backend/disk_cleanup_backend.exe",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "icon": "build/icons/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "perMachine": false,
+      "createStartMenuShortcut": true,
+      "shortcutName": "本地工具箱",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "installerLanguages": [
+        "zh_CN",
+        "en_US"
+      ],
+      "installerIcon": "build/icons/icon.ico",
+      "uninstallerIcon": "build/icons/icon.ico",
+      "installerHeaderIcon": "build/icons/icon.ico"
+    },
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "executableName": "DiskCleanupAssistant",
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://example.com/dca-updates"
+      }
+    ],
+    "compression": "maximum",
+    "protocols": [
+      {
+        "name": "本地工具箱",
+        "schemes": [
+          "local-toolbox"
+        ]
+      }
+    ]
+  },
+  "repository": "placeholder/local-updates"
+}
