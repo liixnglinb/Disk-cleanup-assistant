@@ -1,9 +1,100 @@
-const { app, BrowserWindow } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, net } = require("electron");
 const path = require("path");
 const { startBackend } = require("./backend_runner");
 
 // 自定义协议：网页可通过 local-toolbox:// 唤起本软件
 const PROTOCOL = "local-toolbox";
+
+// ---- 更新检查与智能下载 ----
+const REPO = "liixnglinb/disk-cleanup-assistant";
+const GITHUB_API = `https://api.github.com/repos/${REPO}/releases/latest`;
+const GH_BASE = `https://github.com/${REPO}/releases/download`;
+const DOWNLOAD_SOURCES = [
+  { name: "国内镜像", prefix: "https://gh-proxy.com/" },
+  { name: "备用镜像", prefix: "https://ghproxy.net/" },
+  { name: "GitHub 官方", prefix: "" },
+];
+
+async function fetchJson(url, ms = 8000) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), ms);
+  try {
+    const res = await net.fetch(url, { signal: ctl.signal, headers: { "User-Agent": "local-toolbox" } });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function probeUrl(url, ms = 6000) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), ms);
+  const start = Date.now();
+  try {
+    const res = await net.fetch(url, { method: "HEAD", redirect: "follow", signal: ctl.signal });
+    return { ok: res.ok, ms: Date.now() - start };
+  } catch {
+    return { ok: false, ms };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function versionGt(a, b) {
+  const pa = String(a || "").replace(/^v/, "").split(".").map(Number);
+  const pb = String(b || "").replace(/^v/, "").split(".").map(Number);
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] || 0) > (pb[i] || 0)) return true;
+    if ((pa[i] || 0) < (pb[i] || 0)) return false;
+  }
+  return false;
+}
+
+ipcMain.handle("toolbox:check-update", async () => {
+  const d = await fetchJson(GITHUB_API);
+  if (!d || !d.tag_name) {
+    return { ok: false, error: "无法连接 GitHub，请检查网络后重试" };
+  }
+  const current = app.getVersion();
+  const latest = d.tag_name;
+  const asset = (d.assets || []).find(
+    (a) => a.name.indexOf("LocalToolbox-Setup-") === 0 && a.name.indexOf(".exe") > 0
+  );
+  return {
+    ok: true,
+    current,
+    latest,
+    hasUpdate: versionGt(latest, current),
+    assetName: asset ? asset.name : `LocalToolbox-Setup-${latest.replace(/^v/, "")}.exe`,
+    size: asset ? asset.size : 0,
+    publishedAt: d.published_at || "",
+    body: (d.body || "").slice(0, 600),
+  };
+});
+
+ipcMain.handle("toolbox:smart-download", async (_e, payload) => {
+  const asset = payload && payload.assetName
+    ? payload.assetName
+    : `LocalToolbox-Setup-${app.getVersion()}.exe`;
+  const tag = payload && payload.tag ? payload.tag : `v${app.getVersion()}`;
+  const targets = DOWNLOAD_SOURCES.map((s) => ({
+    name: s.name,
+    url: s.prefix + `${GH_BASE}/${tag}/${asset}`,
+  }));
+  const results = await Promise.all(
+    targets.map(async (t) => ({ ...t, ...(await probeUrl(t.url)) }))
+  );
+  results.sort((a, b) => (a.ok === b.ok ? a.ms - b.ms : a.ok ? -1 : 1));
+  const best = results[0];
+  if (!best || !best.ok) {
+    return { ok: false, error: "所有下载通道均不可达，请稍后重试" };
+  }
+  await shell.openExternal(best.url);
+  return { ok: true, url: best.url, source: best.name, ms: best.ms };
+});
 
 let backendHandle = null;
 let mainWindow = null;
@@ -55,6 +146,14 @@ if (!gotLock) {
         query: { backend: String(port) },
       });
     }
+
+    // 外部链接一律交给系统浏览器，不在应用内新开窗口
+    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+      if (/^https?:/i.test(url)) {
+        shell.openExternal(url);
+      }
+      return { action: "deny" };
+    });
   }
 
   app.whenReady().then(async () => {

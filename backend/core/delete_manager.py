@@ -39,8 +39,13 @@ def _reject_protected(paths: List[str]) -> List[str]:
     return [p for p in paths if is_protected_path(p)]
 
 
-def _size_of_path(path: str) -> int:
-    """估算文件/目录总大小（目录递归求和，失败取 0）。"""
+def _size_of_path(path: str, max_files: int = 20000, max_bytes: int = 3 * 1024**3) -> int:
+    """估算文件/目录总大小（目录递归求和，失败取 0）。
+
+    带快速终止上限（与 cache_dirs.dir_size_bytes 一致）：单个目录文件数超过
+    max_files 或累计大小超过 max_bytes 时提前返回，避免超大缓存目录在删除前
+    统计时长时间卡住 UI。返回值为估算值，仅用于展示释放空间。
+    """
     p = Path(path)
     if p.is_file():
         try:
@@ -48,6 +53,7 @@ def _size_of_path(path: str) -> int:
         except OSError:
             return 0
     total = 0
+    n = 0
     try:
         for root, _dirs, files in os.walk(p):
             for fn in files:
@@ -55,6 +61,9 @@ def _size_of_path(path: str) -> int:
                     total += (Path(root) / fn).stat().st_size
                 except OSError:
                     pass
+                n += 1
+                if n >= max_files or total >= max_bytes:
+                    return total
     except OSError:
         pass
     return total

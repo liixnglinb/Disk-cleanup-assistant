@@ -35,3 +35,47 @@ def test_residue_log():
 
 def test_docs():
     assert classify(r"D:\docs\report.docx", 512, ".docx") == "docs"
+
+
+def test_wechat_data_dir_is_app_data():
+    # 高危回归：微信聊天数据库绝不能判为缓存（推荐删除）
+    assert classify(r"C:\Users\Me\Documents\WeChat Files\wxid_abc\Msg\Multi\msg_0.db",
+                    5 * 1024 * 1024, ".db") == "app_data"
+    assert classify(r"C:\Users\Me\Documents\WeChat Files\wxid_abc\FileStorage\Message\IMG_001.jpg",
+                    1000, ".jpg") == "app_data"
+
+
+def test_wechat_cache_subdir_is_cache():
+    # 微信明确缓存子目录仍应判 cache（可安全清理）
+    assert classify(r"C:\Users\Me\Documents\WeChat Files\wxid_abc\FileStorage\Cache\a.dat",
+                    1000, ".dat") == "cache"
+    assert classify(r"C:\Users\Me\Documents\WeChat Files\wxid_abc\FileStorage\Temp\tmp_1",
+                    1000, ".tmp") == "cache"
+
+
+def test_wechat4_xwechat_data_is_app_data():
+    # 微信 4.0 新目录结构
+    assert classify(r"C:\Users\Me\Documents\WeChat Files\xwechat_files\wxid_abc\Msg\msg.db",
+                    1000, ".db") == "app_data"
+
+
+def test_qq_data_dir_is_app_data():
+    assert classify(r"C:\Users\Me\Documents\Tencent Files\QQ123\Msg\msg_data.db",
+                    1000, ".db") == "app_data"
+
+
+def test_qq_cache_subdir_is_cache():
+    assert classify(r"C:\Users\Me\Documents\Tencent Files\QQ123\Cache\a.dat",
+                    1000, ".dat") == "cache"
+
+
+def test_unknown_fallback():
+    # 未识别文件不再伪装成“用户文档”
+    assert classify(r"D:\misc\weird.xyz", 1000, ".xyz") == "unknown"
+    assert classify(r"D:\misc\noext", 1000, "") == "unknown"
+
+
+def test_unrelated_path_not_misclassified_by_keyword():
+    # 路径里含 nvidia/lark 字样但不属于这些软件目录的，不应误判
+    assert classify(r"D:\Downloads\nvidia-driver-setup.exe", 500, ".exe") != "system"
+    assert classify(r"D:\Projects\lark-tools\readme.md", 512, ".md") == "docs"

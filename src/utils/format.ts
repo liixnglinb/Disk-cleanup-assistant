@@ -45,6 +45,8 @@ export const CATEGORY_META: Record<string, { label: string; color: string }> = {
   residue: { label: "残留文件", color: "#C1341B" },
   large: { label: "大文件", color: "#111111" },
   docs: { label: "用户文档", color: "#1A7F37" },
+  app_data: { label: "软件数据", color: "#6B46C1" },
+  unknown: { label: "未知类型", color: "#8B8B8B" },
 };
 
 export const RECOMMENDATION_META: Record<string, { label: string; cls: string }> = {

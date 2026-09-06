@@ -108,6 +108,17 @@ def _norm(path: str) -> str:
     return (path or "").lower().replace("/", "\\")
 
 
+def _owner_match(path: str, key: str) -> bool:
+    """目录段级归属匹配（替代子串包含）：避免 `Downloads\\nvidia 驱动.exe` 之类
+    路径里恰好含关键字的无关文件被误归属到该软件。"""
+    p = _norm(path)
+    k = (key or "").strip("\\").lower()
+    if not k:
+        return False
+    seg = "\\" + k + "\\"
+    return seg in p or p.endswith("\\" + k)
+
+
 # ---------------------------------------------------------------------------
 # 注册表已装软件 安装位置 -> 软件名 索引（扫描开始时构建一次，只读注册表）
 # ---------------------------------------------------------------------------
@@ -154,7 +165,7 @@ def detect_owner(path: str, category: str = "docs") -> str:
             if p.startswith(d):
                 return name
     for key, owner in _OWNER_MAP:
-        if key.lower() in p:
+        if _owner_match(p, key):
             return owner
     # 用户目录下未识别到具体软件：精确定位
     parts = [s for s in p.split("\\") if s]
@@ -208,6 +219,10 @@ def describe_purpose(ext: str, category: str, path: str) -> str:
         return "系统/动态库文件"
     if category == "cache":
         return "软件缓存文件"
+    if category == "app_data":
+        return "软件数据（聊天记录/配置/数据库）"
+    if category == "unknown":
+        return "未知类型文件（需确认用途）"
     if category == "residue":
         return "残留/临时文件"
     if category == "download":
@@ -234,8 +249,9 @@ def analyze(
     p = _norm(path)
     owner = detect_owner(path, category)
     purpose = describe_purpose(ext, category, path)
-    # B 类存疑：既无已知归属、也无已知扩展名用途
-    needs_ai = (owner == "未知来源" and purpose == "数据文件")
+    # B 类存疑：仅「未知类型」且「归属未知」的文件才需要 AI 分析，
+    # 避免把大量无害的未知扩展名文件全部送 AI 白耗额度
+    needs_ai = (category == "unknown" and owner == "未知来源")
 
     if is_protected or category == "system":
         return {
@@ -247,9 +263,9 @@ def analyze(
             "needs_ai": False,
         }
 
-    # 缓存类
+    # 缓存类：命中明确可重建的缓存/临时段 -> 低风险；其余缓存目录可能混配置 -> 中风险
     if category == "cache":
-        if any(seg in p for seg in _SAFE_CLEAN_SEGS):
+        if any(seg in p for seg in _SAFE_CLEAN_SEGS) or any(seg in p for seg in _BROWSER_CACHE_SEGS):
             return {
                 "purpose": purpose, "owner": owner,
                 "recommendation": "recommend", "risk": "low",
@@ -258,8 +274,17 @@ def analyze(
             }
         return {
             "purpose": purpose, "owner": owner,
-            "recommendation": "recommend", "risk": "low",
-            "recommendation_reason": "缓存文件删除后一般不影响使用，可安全清理释放空间",
+            "recommendation": "recommend", "risk": "medium",
+            "recommendation_reason": "缓存目录可能混有应用配置/数据，建议先查看内容再决定是否清理",
+            "needs_ai": False,
+        }
+
+    # 软件数据类：微信/QQ 聊天记录、配置、数据库等真实数据，绝不推荐删除
+    if category == "app_data":
+        return {
+            "purpose": purpose, "owner": owner,
+            "recommendation": "keep", "risk": "high",
+            "recommendation_reason": "软件数据目录（聊天记录/配置/数据库等），删除会丢失真实数据，请勿批量清理",
             "needs_ai": False,
         }
 
@@ -293,6 +318,15 @@ def analyze(
             "purpose": purpose, "owner": owner,
             "recommendation": "keep", "risk": "medium",
             "recommendation_reason": "用户文档/资料，建议保留，删除前请自行确认",
+            "needs_ai": False,
+        }
+
+    # 未知类型：无法识别用途，谨慎删除
+    if category == "unknown":
+        return {
+            "purpose": purpose, "owner": owner,
+            "recommendation": "caution", "risk": "medium",
+            "recommendation_reason": "无法识别用途的文件，删除前请确认是否仍在使用",
             "needs_ai": needs_ai,
         }
 

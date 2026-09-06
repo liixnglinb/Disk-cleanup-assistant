@@ -1,7 +1,7 @@
 {
   "name": "disk-cleanup-assistant",
   "productName": "本地工具箱",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Windows 磁盘清理助手（Electron + FastAPI）",
   "author": "local-tools",
   "private": true,
@@ -38,11 +38,13 @@
   "build": {
     "appId": "com.localtools.diskcleanup",
     "productName": "本地工具箱",
+    "electronLanguages": [
+      "zh_CN",
+      "en_US"
+    ],
     "files": [
       "dist/**/*",
       "electron/**/*",
-      "backend/**/*",
-      "scripts/**/*",
       "package.json",
       "build/icons/**/*"
     ],

@@ -1,4 +1,4 @@
-export type Category = "system" | "download" | "cache" | "docs" | "residue" | "large";
+export type Category = "system" | "download" | "cache" | "app_data" | "docs" | "residue" | "large" | "unknown";
 export type Recommendation = "recommend" | "caution" | "keep" | "system";
 export type RiskLevel = "low" | "medium" | "high";
 

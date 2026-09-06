@@ -150,6 +150,59 @@ export default function SettingsPanel() {
     });
   };
 
+  // ---- 更新检查与下载 ----
+  type UpdateState =
+    | { status: "idle" }
+    | { status: "checking" }
+    | { status: "latest"; info: UpdateCheckResult }
+    | { status: "has"; info: UpdateCheckResult }
+    | { status: "error"; err: string };
+  const [update, setUpdate] = useState<UpdateState>({ status: "idle" });
+  const [dlBusy, setDlBusy] = useState(false);
+  const [dlMsg, setDlMsg] = useState<string | null>(null);
+  const [dlErr, setDlErr] = useState<string | null>(null);
+
+  const checkUpdate = async () => {
+    setUpdate({ status: "checking" });
+    setDlMsg(null);
+    setDlErr(null);
+    try {
+      const r = await window.dca.checkUpdate();
+      if (!r.ok) {
+        setUpdate({ status: "error", err: r.error || "检查更新失败" });
+        return;
+      }
+      setUpdate(r.hasUpdate ? { status: "has", info: r } : { status: "latest", info: r });
+    } catch (e) {
+      setUpdate({ status: "error", err: String(e instanceof Error ? e.message : e) });
+    }
+  };
+
+  const smartDownload = async () => {
+    if (update.status !== "has") return;
+    setDlBusy(true);
+    setDlMsg(null);
+    setDlErr(null);
+    try {
+      const r = await window.dca.smartDownload({
+        assetName: update.info.assetName,
+        tag: update.info.latest,
+      });
+      if (r.ok) {
+        setDlMsg(`已自动选择「${r.source}」通道（${r.ms} ms），正在打开浏览器下载…`);
+      } else {
+        setDlErr(r.error || "下载失败");
+      }
+    } catch (e) {
+      setDlErr(String(e instanceof Error ? e.message : e));
+    } finally {
+      setDlBusy(false);
+    }
+  };
+
+  const ghBase = "https://github.com/liixnglinb/disk-cleanup-assistant/releases/download";
+  const mirrorBase = "https://gh-proxy.com/https://github.com/liixnglinb/disk-cleanup-assistant/releases/download";
+
   return (
     <div className="tool settings">
       <div className="tool-header">
@@ -292,11 +345,49 @@ export default function SettingsPanel() {
             <>
               <SectionTitle title="关于" />
               <div style={{ padding: "6px 0" }}>
-                <div className="setting-label">本地工具箱 v0.1.0</div>
+                <div className="setting-label">本地工具箱 v{update.status !== "idle" && update.status !== "checking" && update.status !== "error" ? update.info.current : "0.1.2"}</div>
                 <div className="setting-desc" style={{ marginTop: 8, lineHeight: 1.7 }}>
                   内置工具：磁盘清理助手（深度文件分析 + 出厂检测 + AI 辅助 + 安全回收站删除）。
                   <br />架构：Electron + React + TypeScript + Python FastAPI（本地 127.0.0.1 通信、自动端口）。
                   <br />扩展：在 src/tools/registry.tsx 与 backend/tools/ 中登记即可新增工具。
+                </div>
+              </div>
+
+              {/* 更新与下载 */}
+              <div className="setting-row" style={{ borderTop: "1px solid var(--border)", marginTop: 18, paddingTop: 16 }}>
+                <div className="setting-row-main">
+                  <div className="setting-label">检查更新与下载</div>
+                  <div className="setting-desc" style={{ lineHeight: 1.6 }}>
+                    {update.status === "idle" && "自动连接 GitHub 检查最新版本；下载时自动测速，选择更快的通道（国内镜像 / GitHub 官方）。"}
+                    {update.status === "checking" && "正在连接 GitHub 检查最新版本…"}
+                    {update.status === "latest" && `已是最新版本 v${update.info.current}。`}
+                    {update.status === "has" && (
+                      <>发现新版本 <strong>v{update.info.latest}</strong>（当前 v{update.info.current}）
+                      {update.info.publishedAt ? ` · 发布于 ${update.info.publishedAt.slice(0, 10)}` : ""}。
+                      {update.info.body ? <div style={{ marginTop: 6, maxHeight: 72, overflow: "auto", whiteSpace: "pre-wrap", opacity: 0.85, fontSize: 12 }}>{update.info.body}</div> : null}
+                      </>
+                    )}
+                    {update.status === "error" && <span style={{ color: "var(--danger, #e5484d)" }}>{update.err}</span>}
+                  </div>
+
+                  {update.status === "has" && (
+                    <div style={{ marginTop: 12 }}>
+                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                        <button className="btn primary" disabled={dlBusy} onClick={smartDownload}>
+                          {dlBusy ? "测速选路中…" : "智能下载最新版（自动选更快通道）"}
+                        </button>
+                        <a className="btn" href={`${mirrorBase}/${update.info.latest}/${update.info.assetName}`} target="_blank" rel="noopener">国内镜像下载</a>
+                        <a className="btn" href={`${ghBase}/${update.info.latest}/${update.info.assetName}`} target="_blank" rel="noopener">GitHub 下载</a>
+                      </div>
+                      {dlMsg && <div className="notice ok" style={{ marginTop: 10 }}>{dlMsg}</div>}
+                      {dlErr && <div className="notice error" style={{ marginTop: 10 }}>{dlErr}</div>}
+                    </div>
+                  )}
+                </div>
+                <div className="setting-control">
+                  <button className="btn" onClick={checkUpdate} disabled={update.status === "checking"}>
+                    {update.status === "checking" ? "检查中…" : "检查更新"}
+                  </button>
                 </div>
               </div>
             </>
