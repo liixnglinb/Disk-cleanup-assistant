@@ -1,4 +1,30 @@
-# 本地工具箱（Local Toolbox）
+# 🧹 本地工具箱 · Local Toolbox
+
+<div align="center">
+
+[![Release](https://custom-icon-badges.demolab.com/github/v/release/liixnglinb/Disk-cleanup-assistant?style=flat-square&logo=tag&label=%E6%9C%80%E6%96%B0%E7%89%88&labelColor=0d1117&color=2da44e)](https://github.com/liixnglinb/Disk-cleanup-assistant/releases)
+[![License](https://custom-icon-badges.demolab.com/github/license/liixnglinb/Disk-cleanup-assistant?style=flat-square&logo=law&labelColor=0d1117&color=8250df)](LICENSE)
+[![Stars](https://custom-icon-badges.demolab.com/github/stars/liixnglinb/Disk-cleanup-assistant?style=flat-square&logo=star&labelColor=0d1117&color=f4a340)](https://github.com/liixnglinb/Disk-cleanup-assistant/stargazers)
+[![Last Commit](https://custom-icon-badges.demolab.com/github/last-commit/liixnglinb/Disk-cleanup-assistant?style=flat-square&logo=git&labelColor=0d1117&color=5898ff)](https://github.com/liixnglinb/Disk-cleanup-assistant/commits)
+
+</div>
+
+> 一个 Windows 桌面「工具平台」：Electron + React + TypeScript 前端，Python FastAPI 后端，通过 `127.0.0.1` 本地 HTTP 通信。当前内置第一个工具：**磁盘清理助手**；以后可以不断加入更多工具，无需改动平台骨架。
+>
+> **A Windows desktop "tool platform"** — Electron + React + TypeScript frontend with a Python FastAPI backend talking over local `127.0.0.1` HTTP. Ships with its first tool, **Disk Cleanup Assistant**; more tools can be added without touching the platform skeleton.
+
+[在线下载页](https://lxlrwxs.top/local-toolbox/) · [Releases](https://github.com/liixnglinb/Disk-cleanup-assistant/releases)
+
+---
+
+## 🌏 English
+
+- **Safety first**: every deletion requires manual selection + a confirmation dialog; files go to the Recycle Bin (`send2trash`) by default, protected paths (`Windows`, `Program Files`, `ProgramData`…) are rejected twice (UI disabled + backend guard).
+- **Smart cache cleanup**: a built-in knowledge base lists cache directories for browsers, chat apps, dev tools and system updates — each entry explains what it is, the impact of deleting it, and a recommendation/risk level.
+- **Directory encyclopedia**: 75+ common Windows/software directories documented with purpose, attached-app info and deletion advice.
+- **Extensible platform**: add new tools without modifying the platform core.
+
+---
 
 一个 Windows 桌面「工具平台」：Electron + React + TypeScript 前端，Python FastAPI 后端，
 通过 `127.0.0.1` 本地 HTTP 通信。当前内置第一个工具：**磁盘清理助手**；以后可以不断加入更多工具，
