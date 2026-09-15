@@ -18,7 +18,7 @@ class ToolSpec:
     name: str                        # display name
     description: str = ""
     icon: str = "\u25c6"
-    version: str = "0.2.0"
+    version: str = "0.2.1"
     frontend_panel: str = ""         # key of the React panel in src/tools/registry.tsx
     enabled: bool = True
     builtin: bool = False
