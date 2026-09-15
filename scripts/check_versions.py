@@ -17,6 +17,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
+# Windows 上 Python 以 cp1252 写 stdout 时，打印中文会抛 UnicodeEncodeError
+# （GitHub Actions 的 windows-latest 必现）。强制 UTF-8，避免 CI 因输出编码失败。
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 # (标签, 相对路径, 提取方式)
 TEXT_TARGETS = [
     ("backend/__init__.py", r'__version__\s*=\s*"([^"]+)"'),
