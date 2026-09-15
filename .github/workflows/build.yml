@@ -1,0 +1,81 @@
+name: Build Windows installer
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: "22"
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  build:
+    name: Build NSIS installer
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install Python dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Check version consistency
+        run: python scripts/check_versions.py
+
+      - name: Check version matches tag
+        if: github.ref_type == 'tag'
+        run: python scripts/check_versions.py "${{ github.ref_name }}"
+
+      - name: Run backend tests
+        run: python -m pytest backend/tests -q
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Build renderer (typecheck + vite)
+        run: npm run build:renderer
+
+      - name: Build backend exe (PyInstaller)
+        run: npm run build:backend
+
+      - name: Package installer (electron-builder NSIS)
+        run: npx electron-builder --win nsis --publish never
+
+      - name: List build output
+        run: dir release
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LocalToolbox-Setup-${{ github.ref_name }}
+          path: release/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/LocalToolbox-Setup-*.exe
+          generate_release_notes: true
+          fail_on_unmatched_files: true
