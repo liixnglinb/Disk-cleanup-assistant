@@ -1,6 +1,0 @@
-# 证书 / 密钥文件永不入库
-build/certs/*.pfx
-build/certs/*.p12
-*.pfx
-*.p12
-.env

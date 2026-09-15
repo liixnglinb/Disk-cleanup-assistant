@@ -1,41 +1,43 @@
+# ---- 依赖 ----
 node_modules/
+.venv/
+
+# ---- 构建产物 ----
 dist/
 backend_dist/
-.venv/
-__pycache__/
-*.pyc
-tests_tmp/
-.env
-# 签名证书/密钥（永不入库）
-build/certs/*.pfx
-build/certs/*.p12
-*.pfx
-*.p12
-.env
-
-.env.azure
+build/pyinstaller/
+build/*.spec
 build/azure-config.json
-
-# 构建产物 / 安装包（安装包通过 GitHub Releases 分发，不入 git 库）
 release/
 *.exe
 *.blockmap
+
+# ---- 密钥 / 证书（永不入库） ----
+.env
+.env.azure
+*.pfx
+*.p12
+
+# ---- 运行数据 ----
 *.db
 *.db-wal
 *.db-shm
-build/pyinstaller/
+*.log
 
-# 测试临时目录 / 缓存
-tests_tmp_*/
+# ---- 测试临时目录 / 缓存 ----
+__pycache__/
+*.pyc
 .pytest_cache/
-backend/tests/__pycache__/
+tests_tmp/
+tests_tmp_*/
 
-# 参考素材（历史 portal 快照，不入库）
+# ---- 参考素材（历史 portal 快照，不入库） ----
 meoo_portal/
-meoo-1103.png
 meoo-*.png
 
-# 系统 / 编辑器
+# ---- electron-updater 本地调试配置 ----
+dev-app-update.yml
+
+# ---- 系统 / 编辑器 ----
 .DS_Store
 Thumbs.db
-*.log
