@@ -20,9 +20,12 @@ function send(channel, payload) {
 // 自动更新（electron-updater，electron-builder 官方配套更新器）
 // ---------------------------------------------------------------------------
 // 主源写在 package.json 的 publish 里，构建时由 electron-builder 写入
-// resources/app-update.yml。下面两个备用源用于主源不可达时回退——三者都指向
+// resources/app-update.yml。下面几个备用源用于主源不可达时回退——它们都指向
 // GitHub Releases 的 latest 通道，因此拿到的始终是最新版本的 latest.yml 与安装包。
+// 实测（2026-09-15，国内网络）：gh-proxy 与 ghfast.top 直接返回内容；
+// ghproxy.net 会 302 到自身的 /https:// 路径；github.com 直连不可达。
 const FALLBACK_FEEDS = [
+  "https://ghfast.top/https://github.com/liixnglinb/Disk-cleanup-assistant/releases/latest/download",
   "https://ghproxy.net/https://github.com/liixnglinb/Disk-cleanup-assistant/releases/latest/download",
   "https://github.com/liixnglinb/Disk-cleanup-assistant/releases/latest/download",
 ];
