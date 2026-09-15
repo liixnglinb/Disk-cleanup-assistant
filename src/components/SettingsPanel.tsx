@@ -349,7 +349,7 @@ export default function SettingsPanel() {
             <>
               <SectionTitle title="关于" />
               <div style={{ padding: "6px 0" }}>
-                <div className="setting-label">本地工具箱 v{update.status !== "idle" && update.status !== "checking" && update.status !== "error" ? update.info.current : "0.1.3"}</div>
+                <div className="setting-label">本地工具箱 v{update.status !== "idle" && update.status !== "checking" && update.status !== "error" ? update.info.current : "0.1.4"}</div>
                 <div className="setting-desc" style={{ marginTop: 8, lineHeight: 1.7 }}>
                   内置工具：磁盘清理助手（深度文件分析 + 出厂检测 + AI 辅助 + 安全回收站删除）。
                   <br />架构：Electron + React + TypeScript + Python FastAPI（本地 127.0.0.1 通信、自动端口）。
