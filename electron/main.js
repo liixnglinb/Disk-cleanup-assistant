@@ -17,18 +17,28 @@ const DOWNLOAD_SOURCES = [
   { name: "GitHub 官方", prefix: "" },
 ];
 
+// GitHub API 在部分网络下直连不可达（常见于国内），失败时经镜像重试。
+// 下载通道本身已有三路测速，但版本信息这一层此前只有直连，会导致
+// 「检查更新」整体不可用。策略与下载页保持一致。
+const API_MIRRORS = ["https://gh-proxy.com/"];
+
 async function fetchJson(url, ms = 8000) {
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), ms);
-  try {
-    const res = await net.fetch(url, { signal: ctl.signal, headers: { "User-Agent": "local-toolbox" } });
-    if (!res.ok) return null;
-    return await res.json();
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
+  for (const prefix of ["", ...API_MIRRORS]) {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), ms);
+    try {
+      const res = await net.fetch(prefix + url, {
+        signal: ctl.signal,
+        headers: { "User-Agent": "local-toolbox" },
+      });
+      if (res.ok) return await res.json();
+    } catch {
+      /* 该通道不可用，尝试下一个 */
+    } finally {
+      clearTimeout(timer);
+    }
   }
+  return null;
 }
 
 async function probeUrl(url, ms = 6000) {
