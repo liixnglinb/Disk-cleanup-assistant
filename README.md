@@ -82,7 +82,7 @@
   文件列表高度自适应窗口（`min(540px, calc(100vh - 430px))`）；文件选中行加左侧
   强调条；设置页窄窗口下导航与正文纵向堆叠；大文件阈值文案（概览/文件列表）跟随
   设置动态显示，不再写死 100MB。
-- 测试 24 个全绿（新增用户 exe 不误锁用例）。
+- 测试 37 个全绿（新增用户 exe 不误锁用例）。
 
 ## UI 设计系统 v7（taste-skill + impeccable 原则重构）
 - 品牌紫（用户指定的 Meoo 紫 `#562AFF` / `#7C5DFF`）走"品牌色 override"路径，克制成体系：
@@ -93,7 +93,7 @@
   完整 `prefers-reduced-motion` 降级、骨架屏（`skeleton`）替代转圈。
 - 首页为产品概览：欢迎条 + 真实数据统计卡（磁盘/容量/可用空间）+ 工具汇总网格 + 磁盘概览，
   `TOOL_ENTRIES` 注册新工具后自动出现。
-- meoo 参考源码：`meoo_portal/_reference_meoo/`（社区页）、`meoo_portal/_reference_nexus/`（作品站）。
+- 品牌与版式参考来自早期 meoo 门户快照（素材已从本地清理，且长期在 `.gitignore` 中，不随仓库分发）。
 
 ## 自定义协议唤起（local-toolbox://）
 - `electron/main.js`：单实例锁 + `app.setAsDefaultProtocolClient("local-toolbox")` + 二次启动聚焦窗口。
@@ -137,6 +137,23 @@ powershell -ExecutionPolicy Bypass -File scripts\build_backend.ps1
 npx electron-builder --win nsis
 ```
 
+## 自动构建（GitHub Actions）
+
+`.github/workflows/build.yml` 在 `windows-latest` 上依次执行
+pytest → 前端 typecheck/构建 → PyInstaller 后端 → electron-builder NSIS，提供两条路径：
+
+- **发版**：推送 `v*` 形式的 tag，构建成功后安装包自动附到对应 Release。
+  资产名固定为 ASCII 的 `LocalToolbox-Setup-<version>.exe`，与软件内「检查更新」的
+  智能下载逻辑、下载页的动态版本脚本保持一致。
+- **验证**：在 Actions 页手动触发 `workflow_dispatch`，只产出 artifact 供下载试用，
+  不触碰 Release。
+
+打包步骤显式带 `--publish never`，避免 electron-builder 在 tag 构建时误用
+`package.json` 里指向 `example.com` 的 publish 占位配置。
+
+构建前执行 `python scripts/check_versions.py` 校验 10 处版本号是否一致；tag 构建还会
+校验 tag 与代码版本是否匹配，不一致直接中断。本地发版前可用 `npm run check:versions` 自查。
+
 ## 如何新增一个工具
 后端：把 `backend/tools/_template_tool.py` 复制为 `backend/tools/<id>.py`，
 实现路由并导出 `TOOL = ToolSpec(...)`（id / name / icon / include_router），平台会自动发现。
@@ -152,9 +169,10 @@ npx electron-builder --win nsis
 
 ## 测试
 ```powershell
-.\.venv\Scripts\python.exe -m pytest backend/tests -q     # 后端 24 个用例
+.\.venv\Scripts\python.exe -m pytest backend/tests -q     # 后端 37 个用例
 npm run typecheck                                          # 前端类型检查
 npm run build:renderer                                     # 前端生产构建
+python scripts/check_versions.py                           # 版本号一致性自检（发版前）
 python scripts/smoke_packaged.py                           # 打包后端 exe 健康检查
 ```
 ## 代码签名（Windows 分发）

@@ -89,8 +89,9 @@
     "executableName": "DiskCleanupAssistant",
     "publish": [
       {
-        "provider": "generic",
-        "url": "https://example.com/dca-updates"
+        "provider": "github",
+        "owner": "liixnglinb",
+        "repo": "Disk-cleanup-assistant"
       }
     ],
     "compression": "maximum",
@@ -103,5 +104,8 @@
       }
     ]
   },
-  "repository": "placeholder/local-updates"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/liixnglinb/Disk-cleanup-assistant.git"
+  }
 }
