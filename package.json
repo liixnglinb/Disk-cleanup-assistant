@@ -40,7 +40,6 @@
   "build": {
     "appId": "com.localtools.diskcleanup",
     "productName": "本地工具箱",
-    "updaterCacheDirName": "local-toolbox-updater",
     "electronLanguages": [
       "zh_CN",
       "en_US"
