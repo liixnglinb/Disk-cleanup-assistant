@@ -53,6 +53,13 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
+      - name: Read app version
+        id: app
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          "version=$version" >> $env:GITHUB_OUTPUT
+
       - name: Build renderer (typecheck + vite)
         run: npm run build:renderer
 
@@ -68,7 +75,7 @@ jobs:
       - name: Upload installer artifact
         uses: actions/upload-artifact@v7
         with:
-          name: LocalToolbox-Setup-${{ github.ref_name }}
+          name: LocalToolbox-Setup-${{ steps.app.outputs.version }}
           path: release/*.exe
           if-no-files-found: error
           retention-days: 14
