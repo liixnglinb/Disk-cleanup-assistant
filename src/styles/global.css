@@ -9,20 +9,20 @@
    ===========================================================================*/
 :root {
   /* ================= 背景层级（浅色，紫倾向中性） ================= */
-  --bg: #F7F7FC;
-  --bg-elevated: #FDFDFF;
-  --sidebar-bg: #FDFDFF;
-  --surface: #FFFFFF;
-  --surface-hover: #F3F2FA;
-  --input-bg: #FFFFFF;
-  --border: #E8E8F1;
-  --border-strong: #D6D6E4;
+  --bg: #ECECEB;
+  --bg-elevated: #F3F3F2;
+  --sidebar-bg: #F3F3F2;
+  --surface: #F7F7F6;
+  --surface-hover: #EDEDEB;
+  --input-bg: #FBFBFA;
+  --border: rgba(28, 28, 26, 0.08);
+  --border-strong: rgba(28, 28, 26, 0.15);
 
   /* ================= 文字层级 ================= */
-  --text: #1B1B29;
-  --text-body: #41414F;
-  --text-muted: #717186;
-  --text-dim: #A9A9BB;
+  --text: #121211;
+  --text-body: #2E2E2C;
+  --text-muted: #5C5C5A;
+  --text-dim: #8B8B87;
 
   /* ================= 品牌紫（60-30-10 中的 10） ================= */
   --primary: #562AFF;
@@ -69,9 +69,9 @@
   --space-7: 48px;
 
   /* ================= 圆角（单一体系：输入 8 / 控件 10 / 卡片 12 / 胶囊 999） ================= */
-  --radius-sm: 8px;
-  --radius: 10px;
-  --radius-lg: 12px;
+  --radius-sm: 5px;
+  --radius: 7px;
+  --radius-lg: 9px;
   --radius-full: 999px;
 
   /* ================= 动效（统一缓动，只动 transform/opacity） ================= */
@@ -87,29 +87,29 @@
   --content-pad: 24px;
 
   /* ================= 阴影（带紫倾向、无纯黑） ================= */
-  --shadow-sm: 0 1px 2px rgba(35, 30, 70, 0.06);
-  --shadow: 0 4px 16px rgba(35, 30, 70, 0.09);
-  --shadow-lg: 0 14px 40px rgba(35, 30, 70, 0.16);
-  --scroll-thumb: #D2D2E0;
+  --shadow-sm: 0 1px 2px rgba(28, 28, 26, 0.04);
+  --shadow: 0 6px 16px rgba(28, 28, 26, 0.07);
+  --shadow-lg: 0 18px 44px rgba(28, 28, 26, 0.12);
+  --scroll-thumb: rgba(28, 28, 26, 0.18);
   --scroll-track: transparent;
 }
 
 [data-theme="dark"] {
   /* ================= 背景层级（暗色，紫倾向深灰，非纯黑） ================= */
-  --bg: #0D0D13;
-  --bg-elevated: #12121A;
-  --sidebar-bg: #101018;
-  --surface: #17171F;
-  --surface-hover: #20202B;
-  --input-bg: #17171F;
-  --border: #2A2A38;
-  --border-strong: #3A3A4C;
+  --bg: #050608;
+  --bg-elevated: #0A0B0D;
+  --sidebar-bg: #0A0B0D;
+  --surface: #101113;
+  --surface-hover: #151719;
+  --input-bg: #131416;
+  --border: rgba(255, 255, 255, 0.04);
+  --border-strong: rgba(255, 255, 255, 0.09);
 
   /* ================= 文字层级 ================= */
-  --text: #F5F5FA;
-  --text-body: #D3D3DE;
-  --text-muted: #A0A0B3;
-  --text-dim: #6E6E82;
+  --text: #F7F8F8;
+  --text-body: #D8DADE;
+  --text-muted: #8A8F98;
+  --text-dim: #646A74;
 
   /* ================= 品牌紫（暗色提亮） ================= */
   --primary: #8A6CFF;

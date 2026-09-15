@@ -77,8 +77,7 @@ def recycle(paths: List[str], restore_point: bool = False) -> dict:
     if protected:
         raise PermissionError(f"以下路径受系统保护，拒绝删除: {protected}")
 
-    if restore_point:
-        create_restore_point()
+    restore_point_created = create_restore_point() if restore_point else None
 
     ok = []
     failed = []
@@ -95,7 +94,7 @@ def recycle(paths: List[str], restore_point: bool = False) -> dict:
             freed += size
         except Exception as exc:  # noqa: BLE001 保留原始错误给前端展示
             failed.append({"path": p, "error": str(exc)})
-    return {"ok": ok, "failed": failed, "freed_bytes": freed}
+    return {"ok": ok, "failed": failed, "freed_bytes": freed, "restore_point_created": restore_point_created}
 
 
 def permanent_delete(paths: List[str], restore_point: bool = False) -> dict:
@@ -104,8 +103,7 @@ def permanent_delete(paths: List[str], restore_point: bool = False) -> dict:
     if protected:
         raise PermissionError(f"以下路径受系统保护，拒绝删除: {protected}")
 
-    if restore_point:
-        create_restore_point()
+    restore_point_created = create_restore_point() if restore_point else None
 
     ok = []
     failed = []
@@ -126,4 +124,4 @@ def permanent_delete(paths: List[str], restore_point: bool = False) -> dict:
             freed += size
         except Exception as exc:  # noqa: BLE001
             failed.append({"path": p, "error": str(exc)})
-    return {"ok": ok, "failed": failed, "freed_bytes": freed}
+    return {"ok": ok, "failed": failed, "freed_bytes": freed, "restore_point_created": restore_point_created}

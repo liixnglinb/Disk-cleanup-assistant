@@ -76,6 +76,8 @@ export interface DeleteResult {
   ok: { path: string; size: number }[];
   failed: { path: string; error: string }[];
   freed_bytes: number;
+  restore_point_requested?: boolean;
+  restore_point_created?: boolean | null;
 }
 
 export interface SoftwareItem {

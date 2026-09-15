@@ -13,7 +13,11 @@ def delete_files(payload: DeleteFilesRequest):
     """默认移入回收站。payload.permanent=False（安全红线）。"""
     try:
         if payload.permanent:
-            return _permanent(payload.paths, restore_point=payload.restore_point)
-        return _recycle(payload.paths, restore_point=payload.restore_point)
+            result = _permanent(payload.paths, restore_point=payload.restore_point)
+        else:
+            result = _recycle(payload.paths, restore_point=payload.restore_point)
+        result['restore_point_requested'] = payload.restore_point
+        result['restore_point_created'] = None if not payload.restore_point else result.get('restore_point_created')
+        return result
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc))

@@ -6,7 +6,11 @@
 或
     python scripts/run_dev.py
 """
+import os
+
 from fastapi import FastAPI
+from fastapi import Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__
@@ -16,6 +20,18 @@ from .core.config import APP_NAME
 from .platform import platform, router as tools_router, setup_tools
 
 app = FastAPI(title="本地工具箱", version=__version__)
+
+_api_token = os.environ.get('DCA_API_TOKEN', '').strip()
+
+
+@app.middleware('http')
+async def require_local_api_token(request: Request, call_next):
+    # Electron 启动后端时注入 token；独立开发/测试模式保持无 token。
+    if _api_token and request.method != 'OPTIONS':
+        exempt_paths = {'/api/health', '/openapi.json', '/docs', '/docs/oauth2-redirect', '/redoc'}
+        if request.url.path not in exempt_paths and request.headers.get('x-dca-token') != _api_token:
+            return JSONResponse(status_code=401, content={'detail': '缺少有效的本地 API token'})
+    return await call_next(request)
 
 app.add_middleware(
     CORSMiddleware,

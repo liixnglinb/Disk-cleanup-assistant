@@ -1,4 +1,6 @@
 const { app, BrowserWindow, ipcMain, shell, net } = require("electron");
+const crypto = require("crypto");
+const fsPromises = require("fs/promises");
 const path = require("path");
 const { startBackend } = require("./backend_runner");
 
@@ -43,6 +45,15 @@ async function probeUrl(url, ms = 6000) {
   }
 }
 
+function expectedDigestFromGithub(digest) {
+  const match = /^(sha256[:=])([0-9a-f]{64})$/i.exec(String(digest || ""));
+  return match ? match[2].toLowerCase() : null;
+}
+
+function sha256(buffer) {
+  return crypto.createHash("sha256").update(buffer).digest("hex");
+}
+
 function versionGt(a, b) {
   const pa = String(a || "").replace(/^v/, "").split(".").map(Number);
   const pb = String(b || "").replace(/^v/, "").split(".").map(Number);
@@ -70,6 +81,7 @@ ipcMain.handle("toolbox:check-update", async () => {
     hasUpdate: versionGt(latest, current),
     assetName: asset ? asset.name : `LocalToolbox-Setup-${latest.replace(/^v/, "")}.exe`,
     size: asset ? asset.size : 0,
+    digest: asset ? (asset.digest || null) : null,
     publishedAt: d.published_at || "",
     body: (d.body || "").slice(0, 600),
   };
@@ -92,8 +104,31 @@ ipcMain.handle("toolbox:smart-download", async (_e, payload) => {
   if (!best || !best.ok) {
     return { ok: false, error: "所有下载通道均不可达，请稍后重试" };
   }
-  await shell.openExternal(best.url);
-  return { ok: true, url: best.url, source: best.name, ms: best.ms };
+  const expectedDigest = expectedDigestFromGithub(payload && payload.digest);
+  if (!expectedDigest) {
+    await shell.openExternal(best.url);
+    return { ok: true, url: best.url, source: best.name, ms: best.ms, verified: false };
+  }
+
+  const res = await net.fetch(best.url, { redirect: "follow" });
+  if (!res.ok) {
+    return { ok: false, error: `下载失败（HTTP ${res.status}）` };
+  }
+  const bytes = Buffer.from(await res.arrayBuffer());
+  if (payload.size > 0 && bytes.length !== Number(payload.size)) {
+    return { ok: false, error: "更新包大小校验失败" };
+  }
+  if (sha256(bytes) !== expectedDigest) {
+    return { ok: false, error: "更新包 SHA256 校验失败，已停止安装" };
+  }
+
+  const fileName = path.basename(payload.assetName || "LocalToolbox-Setup.exe");
+  const downloadDir = path.join(app.getPath("temp"), "local-toolbox-updates");
+  await fsPromises.mkdir(downloadDir, { recursive: true });
+  const filePath = path.join(downloadDir, fileName);
+  await fsPromises.writeFile(filePath, bytes);
+  await shell.openPath(filePath);
+  return { ok: true, url: best.url, source: best.name, ms: best.ms, verified: true, filePath };
 });
 
 let backendHandle = null;
@@ -122,7 +157,7 @@ if (!gotLock) {
     app.setAsDefaultProtocolClient(PROTOCOL);
   }
 
-  function createWindow(port) {
+  function createWindow(port, apiToken) {
     mainWindow = new BrowserWindow({
       width: 1280,
       height: 820,
@@ -139,12 +174,11 @@ if (!gotLock) {
     });
 
     const devUrl = process.env.ELECTRON_START_URL;
+    const query = { backend: String(port), apiToken };
     if (devUrl) {
-      mainWindow.loadURL(`${devUrl.replace(/\/$/, "")}?backend=${port}`);
+      mainWindow.loadURL(`${devUrl.replace(/\/$/, "")}?${new URLSearchParams(query)}`);
     } else {
-      mainWindow.loadFile(path.join(__dirname, "..", "dist", "index.html"), {
-        query: { backend: String(port) },
-      });
+      mainWindow.loadFile(path.join(__dirname, "..", "dist", "index.html"), { query });
     }
 
     // 外部链接一律交给系统浏览器，不在应用内新开窗口
@@ -157,18 +191,21 @@ if (!gotLock) {
   }
 
   app.whenReady().then(async () => {
+    let apiToken = null;
     try {
-      backendHandle = await startBackend();
+      apiToken = crypto.randomBytes(32).toString("hex");
+      backendHandle = await startBackend(apiToken);
       console.log("[disk-cleanup-assistant] backend running on", backendHandle.port);
     } catch (err) {
       console.error("[disk-cleanup-assistant] backend failed to start:", err);
       backendHandle = null;
+      apiToken = null;
     }
     const port = backendHandle ? backendHandle.port : 17650;
-    createWindow(port);
+    createWindow(port, apiToken);
 
     app.on("activate", () => {
-      if (BrowserWindow.getAllWindows().length === 0) createWindow(port);
+      if (BrowserWindow.getAllWindows().length === 0) createWindow(port, apiToken);
     });
   });
 

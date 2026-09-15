@@ -52,18 +52,19 @@ function waitHealth(port, timeoutMs = 30000) {
   });
 }
 
-async function startBackend() {
+async function startBackend(apiToken) {
   const port = await findFreePort();
   const { exe, args } = resolveBackend();
   const child = spawn(exe, [...args, `--port=${port}`], {
     stdio: "ignore",
     windowsHide: true,
+    env: { ...process.env, ...(apiToken ? { DCA_API_TOKEN: apiToken } : {}) },
   });
   child.on("error", (err) => {
     console.error("backend spawn error", err);
   });
   const okPort = await waitHealth(port);
-  return { child, port: okPort };
+  return { child, port: okPort, apiToken };
 }
 
 module.exports = { startBackend, findFreePort, resolveBackend };

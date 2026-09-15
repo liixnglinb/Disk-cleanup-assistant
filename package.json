@@ -1,7 +1,7 @@
 {
   "name": "disk-cleanup-assistant",
   "productName": "本地工具箱",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Windows 磁盘清理助手（Electron + FastAPI）",
   "author": "local-tools",
   "private": true,
@@ -18,7 +18,8 @@
     "gen:dev-cert": "powershell -ExecutionPolicy Bypass -File scripts\\generate_dev_cert.ps1",
     "dist:azure": "npm run build:renderer && npm run build:backend && node scripts/prepare-azure-config.mjs && electron-builder --win nsis --config build/azure-config.json",
     "verify:azure-env": "node scripts/prepare-azure-config.mjs",
-    "test:backend": "cd backend && python -m pytest -q"
+    "test:backend": "cd backend && python -m pytest -q",
+    "check:versions": "python scripts/check_versions.py"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -61,7 +62,7 @@
       "target": [
         "nsis"
       ],
-      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "artifactName": "LocalToolbox-Setup-${version}.${ext}",
       "icon": "build/icons/icon.ico"
     },
     "nsis": {

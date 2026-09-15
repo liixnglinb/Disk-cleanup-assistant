@@ -13,11 +13,16 @@ function backendBase(): string {
   return `http://127.0.0.1:${port}`;
 }
 
+function backendToken(): string | null {
+  return window.dca?.getApiToken() || new URLSearchParams(window.location.search).get("apiToken");
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${backendBase()}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...init,
-  });
+  const token = backendToken();
+  const headers = new Headers(init?.headers);
+  if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  if (token) headers.set("X-DCA-Token", token);
+  const res = await fetch(`${backendBase()}${path}`, { ...init, headers });
   if (!res.ok) {
     let detail = res.statusText;
     try {

@@ -17,7 +17,7 @@ export const TOOL_ENTRIES: ToolEntry[] = [
       description:
         "扫描盘符全部文件，按用途智能分类，大文件高亮，勾选后安全移入回收站释放空间。",
       icon: "eraser",
-      version: "0.1.2",
+      version: "0.1.3",
     },
     component: lazy(() => import("./disk-cleanup/DiskCleanupTool")),
   },

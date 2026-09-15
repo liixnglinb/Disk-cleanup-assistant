@@ -49,6 +49,11 @@ export default function ConfirmDialog({ open, paths, onClose, onDone }: Props) {
             <div className="report-stat"><b className="num">{formatBytes(result.freed_bytes)}</b><span>释放空间</span></div>
             <div className={`report-stat ${result.failed.length > 0 ? "has-fail" : ""}`}><b className="num">{result.failed.length}</b><span>失败</span></div>
           </div>
+          {result.restore_point_requested && result.restore_point_created === false && (
+            <div className="notice error">
+              还原点创建失败（可能需要管理员权限或未开启系统保护），删除操作已继续。
+            </div>
+          )}
           {result.failed.length > 0 && (
             <div className="report-failed">
               <div className="rf-title">失败明细</div>

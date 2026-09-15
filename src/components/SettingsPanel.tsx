@@ -187,9 +187,13 @@ export default function SettingsPanel() {
       const r = await window.dca.smartDownload({
         assetName: update.info.assetName,
         tag: update.info.latest,
+        digest: update.info.digest,
+        size: update.info.size,
       });
       if (r.ok) {
-        setDlMsg(`已自动选择「${r.source}」通道（${r.ms} ms），正在打开浏览器下载…`);
+        setDlMsg(r.verified
+          ? `已下载并完成 SHA256 校验，正在打开安装包。`
+          : `已自动选择「${r.source}」通道，正在打开浏览器下载（未提供官方校验值）。`);
       } else {
         setDlErr(r.error || "下载失败");
       }
@@ -345,7 +349,7 @@ export default function SettingsPanel() {
             <>
               <SectionTitle title="关于" />
               <div style={{ padding: "6px 0" }}>
-                <div className="setting-label">本地工具箱 v{update.status !== "idle" && update.status !== "checking" && update.status !== "error" ? update.info.current : "0.1.2"}</div>
+                <div className="setting-label">本地工具箱 v{update.status !== "idle" && update.status !== "checking" && update.status !== "error" ? update.info.current : "0.1.3"}</div>
                 <div className="setting-desc" style={{ marginTop: 8, lineHeight: 1.7 }}>
                   内置工具：磁盘清理助手（深度文件分析 + 出厂检测 + AI 辅助 + 安全回收站删除）。
                   <br />架构：Electron + React + TypeScript + Python FastAPI（本地 127.0.0.1 通信、自动端口）。
