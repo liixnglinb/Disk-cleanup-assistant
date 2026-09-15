@@ -143,8 +143,8 @@ npx electron-builder --win nsis
 pytest → 前端 typecheck/构建 → PyInstaller 后端 → electron-builder NSIS，提供两条路径：
 
 - **发版**：推送 `v*` 形式的 tag，构建成功后安装包自动附到对应 Release。
-  资产名固定为 ASCII 的 `LocalToolbox-Setup-<version>.exe`，与软件内「检查更新」的
-  智能下载逻辑、下载页的动态版本脚本保持一致。
+  资产名固定为 ASCII 的 `LocalToolbox-Setup-<version>.exe`，与软件内 electron-updater
+  的更新源、下载页的动态版本脚本三者的约定保持一致。
 - **验证**：在 Actions 页手动触发 `workflow_dispatch`，只产出 artifact 供下载试用，
   不触碰 Release。
 
@@ -153,6 +153,27 @@ pytest → 前端 typecheck/构建 → PyInstaller 后端 → electron-builder N
 
 构建前执行 `python scripts/check_versions.py` 校验 10 处版本号是否一致；tag 构建还会
 校验 tag 与代码版本是否匹配，不一致直接中断。本地发版前可用 `npm run check:versions` 自查。
+
+## 自动更新（electron-updater）
+
+使用 electron-builder 官方配套的 **electron-updater**。官方在 Windows 上仅支持 NSIS 目标，
+便携版（portable）不支持自动更新，因此分发形态确定为 **NSIS 用户级安装**
+（`oneClick: true` + `perMachine: false`，装到 `%LOCALAPPDATA%\Programs\`，无需管理员权限）。
+
+用户体验：首次双击安装包装一次，之后所有更新都在软件内完成 ——
+「设置 → 关于 → 软件更新」→ 检查更新 → 下载更新（带进度与速度）→ 重启并安装。
+安装由 `quitAndInstall(true, true)` 静默执行，不弹安装向导，等同原地更新。
+
+**发布新版本必须上传 `latest.yml`**（连同 `*.blockmap`）：electron-updater 靠它比对版本、
+定位安装包并做增量下载；只上传 `.exe` 会导致更新检查直接失败。
+
+**更新源**：`package.json` 的 `publish` 为 generic provider，指向
+`https://gh-proxy.com/<GitHub releases/latest/download>` —— 国内网络无法直连 `api.github.com`
+与 `github.com`，必须经镜像才可达。主源不可用时，主进程会依次回退到 `ghproxy.net` 与
+GitHub 直连（见 `electron/main.js` 的 `FALLBACK_FEEDS`）。
+
+本地调试：`app.isPackaged` 为 false 时界面会提示"开发模式下不检查更新"；如需在开发模式
+走通完整流程，可在项目根放一个 `dev-app-update.yml`（已 gitignore）。
 
 ## 如何新增一个工具
 后端：把 `backend/tools/_template_tool.py` 复制为 `backend/tools/<id>.py`，
@@ -256,6 +277,6 @@ npm run dist:azure
 npm run verify:azure-env
 ```
 
-说明：electron-builder 会**自动安装** PowerShell 模块 `TrustedSigning`（首次需要联网）并调用 `Invoke-TrustedSigning` 完成 SHA256 + 时间戳签名，产物仍是 `release\本地工具箱-Setup-0.1.0.exe`。
+说明：electron-builder 会**自动安装** PowerShell 模块 `TrustedSigning`（首次需要联网）并调用 `Invoke-TrustedSigning` 完成 SHA256 + 时间戳签名，产物仍是 `release\LocalToolbox-Setup-<version>.exe`。
 
 > 建议安装 **PowerShell 7（pwsh）**，Trusted Signing 在 pwsh 下最稳定；仅装了 Windows PowerShell 5.1 时也能自动回退使用。

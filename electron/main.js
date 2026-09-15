@@ -1,68 +1,52 @@
-const { app, BrowserWindow, ipcMain, shell, net } = require("electron");
+const { app, BrowserWindow, ipcMain, shell } = require("electron");
 const crypto = require("crypto");
-const fsPromises = require("fs/promises");
 const path = require("path");
+const { autoUpdater } = require("electron-updater");
 const { startBackend } = require("./backend_runner");
 
 // 自定义协议：网页可通过 local-toolbox:// 唤起本软件
 const PROTOCOL = "local-toolbox";
 
-// ---- 更新检查与智能下载 ----
-const REPO = "liixnglinb/disk-cleanup-assistant";
-const GITHUB_API = `https://api.github.com/repos/${REPO}/releases/latest`;
-const GH_BASE = `https://github.com/${REPO}/releases/download`;
-const DOWNLOAD_SOURCES = [
-  { name: "国内镜像", prefix: "https://gh-proxy.com/" },
-  { name: "备用镜像", prefix: "https://ghproxy.net/" },
-  { name: "GitHub 官方", prefix: "" },
+let backendHandle = null;
+let mainWindow = null;
+
+function send(channel, payload) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send(channel, payload);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 自动更新（electron-updater，electron-builder 官方配套更新器）
+// ---------------------------------------------------------------------------
+// 主源写在 package.json 的 publish 里，构建时由 electron-builder 写入
+// resources/app-update.yml。下面两个备用源用于主源不可达时回退——三者都指向
+// GitHub Releases 的 latest 通道，因此拿到的始终是最新版本的 latest.yml 与安装包。
+const FALLBACK_FEEDS = [
+  "https://ghproxy.net/https://github.com/liixnglinb/Disk-cleanup-assistant/releases/latest/download",
+  "https://github.com/liixnglinb/Disk-cleanup-assistant/releases/latest/download",
 ];
 
-// GitHub API 在部分网络下直连不可达（常见于国内），失败时经镜像重试。
-// 下载通道本身已有三路测速，但版本信息这一层此前只有直连，会导致
-// 「检查更新」整体不可用。策略与下载页保持一致。
-const API_MIRRORS = ["https://gh-proxy.com/"];
+autoUpdater.autoDownload = false; // 由用户在界面确认后再下载
+autoUpdater.autoInstallOnAppQuit = false; // 下载完成后由用户点「重启并安装」
+autoUpdater.allowDowngrade = false;
 
-async function fetchJson(url, ms = 8000) {
-  for (const prefix of ["", ...API_MIRRORS]) {
-    const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), ms);
-    try {
-      const res = await net.fetch(prefix + url, {
-        signal: ctl.signal,
-        headers: { "User-Agent": "local-toolbox" },
-      });
-      if (res.ok) return await res.json();
-    } catch {
-      /* 该通道不可用，尝试下一个 */
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-  return null;
-}
+autoUpdater.on("download-progress", (p) => {
+  send("update:progress", {
+    percent: Math.round((p.percent || 0) * 10) / 10,
+    transferred: p.transferred || 0,
+    total: p.total || 0,
+    bytesPerSecond: p.bytesPerSecond || 0,
+  });
+});
 
-async function probeUrl(url, ms = 6000) {
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), ms);
-  const start = Date.now();
-  try {
-    const res = await net.fetch(url, { method: "HEAD", redirect: "follow", signal: ctl.signal });
-    return { ok: res.ok, ms: Date.now() - start };
-  } catch {
-    return { ok: false, ms };
-  } finally {
-    clearTimeout(timer);
-  }
-}
+autoUpdater.on("update-downloaded", (info) => {
+  send("update:downloaded", { version: (info && info.version) || "" });
+});
 
-function expectedDigestFromGithub(digest) {
-  const match = /^(sha256[:=])([0-9a-f]{64})$/i.exec(String(digest || ""));
-  return match ? match[2].toLowerCase() : null;
-}
-
-function sha256(buffer) {
-  return crypto.createHash("sha256").update(buffer).digest("hex");
-}
+autoUpdater.on("error", (err) => {
+  send("update:error", { message: String((err && err.message) || err) });
+});
 
 function versionGt(a, b) {
   const pa = String(a || "").replace(/^v/, "").split(".").map(Number);
@@ -74,77 +58,59 @@ function versionGt(a, b) {
   return false;
 }
 
-ipcMain.handle("toolbox:check-update", async () => {
-  const d = await fetchJson(GITHUB_API);
-  if (!d || !d.tag_name) {
-    return { ok: false, error: "无法连接 GitHub，请检查网络后重试" };
+async function checkWithFallback() {
+  const feeds = [null, ...FALLBACK_FEEDS]; // null = 沿用 app-update.yml 中的主源
+  let lastError = "无法连接更新服务，请检查网络后重试";
+  for (const feed of feeds) {
+    if (feed) autoUpdater.setFeedURL({ provider: "generic", url: feed });
+    try {
+      const result = await autoUpdater.checkForUpdates();
+      if (result && result.updateInfo) return { ok: true, result };
+    } catch (err) {
+      lastError = String((err && err.message) || err);
+    }
+  }
+  return { ok: false, error: lastError };
+}
+
+ipcMain.handle("update:check", async () => {
+  if (!app.isPackaged) {
+    return { ok: false, error: "开发模式下不检查更新，请安装打包版本后再试。" };
   }
   const current = app.getVersion();
-  const latest = d.tag_name;
-  const asset = (d.assets || []).find(
-    (a) => a.name.indexOf("LocalToolbox-Setup-") === 0 && a.name.indexOf(".exe") > 0
-  );
+  const r = await checkWithFallback();
+  if (!r.ok) return { ok: false, error: r.error };
+  const info = r.result.updateInfo;
+  const latest = String(info.version || "").replace(/^v/, "");
+  const notes = typeof info.releaseNotes === "string" ? info.releaseNotes : "";
   return {
     ok: true,
     current,
     latest,
     hasUpdate: versionGt(latest, current),
-    assetName: asset ? asset.name : `LocalToolbox-Setup-${latest.replace(/^v/, "")}.exe`,
-    size: asset ? asset.size : 0,
-    digest: asset ? (asset.digest || null) : null,
-    publishedAt: d.published_at || "",
-    body: (d.body || "").slice(0, 600),
+    releaseDate: info.releaseDate || "",
+    releaseNotes: notes.slice(0, 800),
   };
 });
 
-ipcMain.handle("toolbox:smart-download", async (_e, payload) => {
-  const asset = payload && payload.assetName
-    ? payload.assetName
-    : `LocalToolbox-Setup-${app.getVersion()}.exe`;
-  const tag = payload && payload.tag ? payload.tag : `v${app.getVersion()}`;
-  const targets = DOWNLOAD_SOURCES.map((s) => ({
-    name: s.name,
-    url: s.prefix + `${GH_BASE}/${tag}/${asset}`,
-  }));
-  const results = await Promise.all(
-    targets.map(async (t) => ({ ...t, ...(await probeUrl(t.url)) }))
-  );
-  results.sort((a, b) => (a.ok === b.ok ? a.ms - b.ms : a.ok ? -1 : 1));
-  const best = results[0];
-  if (!best || !best.ok) {
-    return { ok: false, error: "所有下载通道均不可达，请稍后重试" };
+ipcMain.handle("update:download", async () => {
+  try {
+    await autoUpdater.downloadUpdate();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String((err && err.message) || err) };
   }
-  const expectedDigest = expectedDigestFromGithub(payload && payload.digest);
-  if (!expectedDigest) {
-    await shell.openExternal(best.url);
-    return { ok: true, url: best.url, source: best.name, ms: best.ms, verified: false };
-  }
-
-  const res = await net.fetch(best.url, { redirect: "follow" });
-  if (!res.ok) {
-    return { ok: false, error: `下载失败（HTTP ${res.status}）` };
-  }
-  const bytes = Buffer.from(await res.arrayBuffer());
-  if (payload.size > 0 && bytes.length !== Number(payload.size)) {
-    return { ok: false, error: "更新包大小校验失败" };
-  }
-  if (sha256(bytes) !== expectedDigest) {
-    return { ok: false, error: "更新包 SHA256 校验失败，已停止安装" };
-  }
-
-  const fileName = path.basename(payload.assetName || "LocalToolbox-Setup.exe");
-  const downloadDir = path.join(app.getPath("temp"), "local-toolbox-updates");
-  await fsPromises.mkdir(downloadDir, { recursive: true });
-  const filePath = path.join(downloadDir, fileName);
-  await fsPromises.writeFile(filePath, bytes);
-  await shell.openPath(filePath);
-  return { ok: true, url: best.url, source: best.name, ms: best.ms, verified: true, filePath };
 });
 
-let backendHandle = null;
-let mainWindow = null;
+ipcMain.handle("update:install", () => {
+  // 静默安装：不显示安装向导，装完自动拉起新版本，用户无需重新走安装流程
+  setImmediate(() => autoUpdater.quitAndInstall(true, true));
+  return { ok: true };
+});
 
-// ---- 单实例锁：避免重复启动；协议唤起时聚焦已有窗口 ----
+// ---------------------------------------------------------------------------
+// 单实例锁 + 自定义协议
+// ---------------------------------------------------------------------------
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();

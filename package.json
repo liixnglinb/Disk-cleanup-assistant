@@ -1,7 +1,7 @@
 {
   "name": "disk-cleanup-assistant",
   "productName": "本地工具箱",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "Windows 磁盘清理助手（Electron + FastAPI）",
   "author": "local-tools",
   "private": true,
@@ -22,6 +22,7 @@
     "check:versions": "python scripts/check_versions.py"
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
@@ -39,6 +40,7 @@
   "build": {
     "appId": "com.localtools.diskcleanup",
     "productName": "本地工具箱",
+    "updaterCacheDirName": "local-toolbox-updater",
     "electronLanguages": [
       "zh_CN",
       "en_US"
@@ -66,8 +68,7 @@
       "icon": "build/icons/icon.ico"
     },
     "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
+      "oneClick": true,
       "createDesktopShortcut": true,
       "perMachine": false,
       "createStartMenuShortcut": true,
@@ -89,9 +90,8 @@
     "executableName": "DiskCleanupAssistant",
     "publish": [
       {
-        "provider": "github",
-        "owner": "liixnglinb",
-        "repo": "Disk-cleanup-assistant"
+        "provider": "generic",
+        "url": "https://gh-proxy.com/https://github.com/liixnglinb/Disk-cleanup-assistant/releases/latest/download"
       }
     ],
     "compression": "maximum",

@@ -117,7 +117,7 @@ export default function Shell({ nav, active, onNavigate, statusInfo, children }:
             ))}
           </nav>
           <div className="side-spacer" />
-          <div className="side-footer">本地工具箱 v0.1.4 · 本地运行</div>
+          <div className="side-footer">本地工具箱 v0.2.0 · 本地运行</div>
         </aside>
 
         <div className="main">

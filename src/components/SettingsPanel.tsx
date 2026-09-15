@@ -150,21 +150,46 @@ export default function SettingsPanel() {
     });
   };
 
-  // ---- 更新检查与下载 ----
+  // ---- 自动更新（electron-updater） ----
   type UpdateState =
     | { status: "idle" }
     | { status: "checking" }
     | { status: "latest"; info: UpdateCheckResult }
     | { status: "has"; info: UpdateCheckResult }
+    | { status: "downloading"; info: UpdateCheckResult; progress: UpdateProgress }
+    | { status: "downloaded"; info: UpdateCheckResult }
     | { status: "error"; err: string };
   const [update, setUpdate] = useState<UpdateState>({ status: "idle" });
-  const [dlBusy, setDlBusy] = useState(false);
-  const [dlMsg, setDlMsg] = useState<string | null>(null);
   const [dlErr, setDlErr] = useState<string | null>(null);
 
+  // 主进程推送的下载进度 / 下载完成 / 出错事件
+  useEffect(() => {
+    if (!window.dca) return;
+    const offProgress = window.dca.onUpdateProgress((p) => {
+      setUpdate((prev) => (prev.status === "downloading" ? { ...prev, progress: p } : prev));
+    });
+    const offDownloaded = window.dca.onUpdateDownloaded(() => {
+      setUpdate((prev) =>
+        prev.status === "downloading" ? { status: "downloaded", info: prev.info } : prev,
+      );
+    });
+    const offError = window.dca.onUpdateError((e) => {
+      setDlErr(e.message);
+      setUpdate((prev) => (prev.status === "downloading" ? { status: "has", info: prev.info } : prev));
+    });
+    return () => {
+      offProgress();
+      offDownloaded();
+      offError();
+    };
+  }, []);
+
   const checkUpdate = async () => {
+    if (!window.dca) {
+      setUpdate({ status: "error", err: "当前环境不支持自动更新（仅桌面版可用）。" });
+      return;
+    }
     setUpdate({ status: "checking" });
-    setDlMsg(null);
     setDlErr(null);
     try {
       const r = await window.dca.checkUpdate();
@@ -178,34 +203,26 @@ export default function SettingsPanel() {
     }
   };
 
-  const smartDownload = async () => {
-    if (update.status !== "has") return;
-    setDlBusy(true);
-    setDlMsg(null);
+  const startDownload = async () => {
+    if (update.status !== "has" || !window.dca) return;
+    const info = update.info;
     setDlErr(null);
-    try {
-      const r = await window.dca.smartDownload({
-        assetName: update.info.assetName,
-        tag: update.info.latest,
-        digest: update.info.digest,
-        size: update.info.size,
-      });
-      if (r.ok) {
-        setDlMsg(r.verified
-          ? `已下载并完成 SHA256 校验，正在打开安装包。`
-          : `已自动选择「${r.source}」通道，正在打开浏览器下载（未提供官方校验值）。`);
-      } else {
-        setDlErr(r.error || "下载失败");
-      }
-    } catch (e) {
-      setDlErr(String(e instanceof Error ? e.message : e));
-    } finally {
-      setDlBusy(false);
+    setUpdate({
+      status: "downloading",
+      info,
+      progress: { percent: 0, transferred: 0, total: 0, bytesPerSecond: 0 },
+    });
+    const r = await window.dca.downloadUpdate();
+    if (!r.ok) {
+      setDlErr(r.error || "下载更新失败");
+      setUpdate({ status: "has", info });
     }
   };
 
-  const ghBase = "https://github.com/liixnglinb/disk-cleanup-assistant/releases/download";
-  const mirrorBase = "https://gh-proxy.com/https://github.com/liixnglinb/disk-cleanup-assistant/releases/download";
+  const installUpdate = async () => {
+    if (!window.dca) return;
+    await window.dca.installUpdate();
+  };
 
   return (
     <div className="tool settings">
@@ -349,7 +366,7 @@ export default function SettingsPanel() {
             <>
               <SectionTitle title="关于" />
               <div style={{ padding: "6px 0" }}>
-                <div className="setting-label">本地工具箱 v{update.status !== "idle" && update.status !== "checking" && update.status !== "error" ? update.info.current : "0.1.4"}</div>
+                <div className="setting-label">本地工具箱 v{update.status !== "idle" && update.status !== "checking" && update.status !== "error" ? update.info.current : "0.2.0"}</div>
                 <div className="setting-desc" style={{ marginTop: 8, lineHeight: 1.7 }}>
                   内置工具：磁盘清理助手（深度文件分析 + 出厂检测 + AI 辅助 + 安全回收站删除）。
                   <br />架构：Electron + React + TypeScript + Python FastAPI（本地 127.0.0.1 通信、自动端口）。
@@ -357,39 +374,54 @@ export default function SettingsPanel() {
                 </div>
               </div>
 
-              {/* 更新与下载 */}
+              {/* 软件更新（electron-updater） */}
               <div className="setting-row" style={{ borderTop: "1px solid var(--border)", marginTop: 18, paddingTop: 16 }}>
                 <div className="setting-row-main">
-                  <div className="setting-label">检查更新与下载</div>
+                  <div className="setting-label">软件更新</div>
                   <div className="setting-desc" style={{ lineHeight: 1.6 }}>
-                    {update.status === "idle" && "自动连接 GitHub 检查最新版本；下载时自动测速，选择更快的通道（国内镜像 / GitHub 官方）。"}
-                    {update.status === "checking" && "正在连接 GitHub 检查最新版本…"}
+                    {update.status === "idle" && "发现新版本后可在软件内直接下载，重启即完成更新，无需再下载安装包。"}
+                    {update.status === "checking" && "正在检查最新版本…"}
                     {update.status === "latest" && `已是最新版本 v${update.info.current}。`}
                     {update.status === "has" && (
                       <>发现新版本 <strong>v{update.info.latest}</strong>（当前 v{update.info.current}）
-                      {update.info.publishedAt ? ` · 发布于 ${update.info.publishedAt.slice(0, 10)}` : ""}。
-                      {update.info.body ? <div style={{ marginTop: 6, maxHeight: 72, overflow: "auto", whiteSpace: "pre-wrap", opacity: 0.85, fontSize: 12 }}>{update.info.body}</div> : null}
+                      {update.info.releaseDate ? ` · 发布于 ${update.info.releaseDate.slice(0, 10)}` : ""}。
+                      {update.info.releaseNotes ? <div style={{ marginTop: 6, maxHeight: 84, overflow: "auto", whiteSpace: "pre-wrap", opacity: 0.85, fontSize: 12 }}>{update.info.releaseNotes}</div> : null}
                       </>
                     )}
+                    {update.status === "downloading" && (
+                      <>
+                        正在下载 v{update.info.latest} … {update.progress.percent.toFixed(1)}%
+                        <div style={{ marginTop: 8, height: 6, borderRadius: 3, background: "var(--border)", overflow: "hidden" }}>
+                          <div style={{ width: `${Math.min(100, update.progress.percent)}%`, height: "100%", background: "var(--primary, #378ADD)", transition: "width .2s" }} />
+                        </div>
+                        <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8 }}>
+                          {(update.progress.transferred / 1048576).toFixed(1)} / {(update.progress.total / 1048576).toFixed(1)} MB
+                          {update.progress.bytesPerSecond > 0 ? ` · ${(update.progress.bytesPerSecond / 1048576).toFixed(1)} MB/s` : ""}
+                        </div>
+                      </>
+                    )}
+                    {update.status === "downloaded" && `v${update.info.latest} 已下载完成，重启后即可使用新版本。`}
                     {update.status === "error" && <span style={{ color: "var(--danger, #e5484d)" }}>{update.err}</span>}
                   </div>
 
                   {update.status === "has" && (
                     <div style={{ marginTop: 12 }}>
-                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                        <button className="btn primary" disabled={dlBusy} onClick={smartDownload}>
-                          {dlBusy ? "测速选路中…" : "智能下载最新版（自动选更快通道）"}
-                        </button>
-                        <a className="btn" href={`${mirrorBase}/${update.info.latest}/${update.info.assetName}`} target="_blank" rel="noopener">国内镜像下载</a>
-                        <a className="btn" href={`${ghBase}/${update.info.latest}/${update.info.assetName}`} target="_blank" rel="noopener">GitHub 下载</a>
-                      </div>
-                      {dlMsg && <div className="notice ok" style={{ marginTop: 10 }}>{dlMsg}</div>}
-                      {dlErr && <div className="notice error" style={{ marginTop: 10 }}>{dlErr}</div>}
+                      <button className="btn primary" onClick={startDownload}>下载更新</button>
                     </div>
                   )}
+                  {update.status === "downloaded" && (
+                    <div style={{ marginTop: 12 }}>
+                      <button className="btn primary" onClick={installUpdate}>重启并安装</button>
+                    </div>
+                  )}
+                  {dlErr && <div className="notice error" style={{ marginTop: 10 }}>{dlErr}</div>}
                 </div>
                 <div className="setting-control">
-                  <button className="btn" onClick={checkUpdate} disabled={update.status === "checking"}>
+                  <button
+                    className="btn"
+                    onClick={checkUpdate}
+                    disabled={update.status === "checking" || update.status === "downloading"}
+                  >
                     {update.status === "checking" ? "检查中…" : "检查更新"}
                   </button>
                 </div>

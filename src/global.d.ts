@@ -4,28 +4,31 @@ interface UpdateCheckResult {
   current?: string;
   latest?: string;
   hasUpdate?: boolean;
-  assetName?: string;
-  size?: number;
-  digest?: string | null;
-  publishedAt?: string;
-  body?: string;
+  releaseDate?: string;
+  releaseNotes?: string;
 }
 
-interface SmartDownloadResult {
+interface UpdateProgress {
+  percent: number;
+  transferred: number;
+  total: number;
+  bytesPerSecond: number;
+}
+
+interface UpdateActionResult {
   ok: boolean;
   error?: string;
-  url?: string;
-  source?: string;
-  ms?: number;
-  verified?: boolean;
-  filePath?: string;
 }
 
 interface DcaBridge {
   platform: string;
   getApiToken: () => string | null;
   checkUpdate: () => Promise<UpdateCheckResult>;
-  smartDownload: (payload: { assetName?: string; tag?: string; digest?: string | null; size?: number }) => Promise<SmartDownloadResult>;
+  downloadUpdate: () => Promise<UpdateActionResult>;
+  installUpdate: () => Promise<UpdateActionResult>;
+  onUpdateProgress: (cb: (p: UpdateProgress) => void) => () => void;
+  onUpdateDownloaded: (cb: (i: { version: string }) => void) => () => void;
+  onUpdateError: (cb: (e: { message: string }) => void) => () => void;
 }
 
 interface Window {
