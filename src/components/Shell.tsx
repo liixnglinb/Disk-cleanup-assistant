@@ -5,25 +5,10 @@ import { useTheme } from "../hooks/useTheme";
 import Icon from "./icons";
 import type { DriveInfo } from "../types";
 
-export interface NavItem {
-  key: string;
-  label: string;
-  icon?: string;
-  badge?: string;
-}
-
 export interface StatusInfo {
   kind: "idle" | "running" | "paused" | "ok" | "warn";
   label: string;
   right?: string;
-}
-
-interface Props {
-  nav: NavItem[];
-  active: string;
-  onNavigate: (key: string) => void;
-  statusInfo: StatusInfo;
-  children: React.ReactNode;
 }
 
 function deriveStatusInfo(st: any): StatusInfo {
@@ -70,7 +55,7 @@ function TopbarDrives() {
   );
 }
 
-export default function Shell({ nav, active, onNavigate, statusInfo, children }: Props) {
+export default function Shell({ statusInfo, children }: { statusInfo: StatusInfo; children: React.ReactNode }) {
   const { theme, toggleTheme } = useTheme();
   const [liveScan, setLiveScan] = useState<any>(null);
   useEffect(() => {
@@ -83,10 +68,10 @@ export default function Shell({ nav, active, onNavigate, statusInfo, children }:
   return (
     <div className="app">
       <header className="topbar">
-        <div className="topbar-brand">
-          <div className="topbar-logo"><Icon name="disk" size={16} /></div>
+        <div className="topbar-brand" title={`磁盘清理助手 v${__APP_VERSION__}`}>
+          <div className="topbar-logo"><Icon name="eraser" size={16} /></div>
           <div className="topbar-brand-text">
-            <span className="topbar-title">本地工具箱</span>
+            <span className="topbar-title">磁盘清理助手</span>
           </div>
         </div>
         <TopbarDrives />
@@ -99,27 +84,6 @@ export default function Shell({ nav, active, onNavigate, statusInfo, children }:
       </header>
 
       <div className="workspace">
-        <aside className="sidebar">
-          <nav>
-            {nav.map((item) => (
-              <button
-                key={item.key}
-                className={`side-item ${active === item.key ? "active" : ""}`}
-                onClick={() => onNavigate(item.key)}
-                title={item.label}
-              >
-                <span className="side-icon">
-                  {item.icon ? <Icon name={item.icon as any} size={17} /> : <Icon name="file" size={17} />}
-                </span>
-                <span className="side-label">{item.label}</span>
-                {item.badge && <span className="badge badge-muted nav-badge">{item.badge}</span>}
-              </button>
-            ))}
-          </nav>
-          <div className="side-spacer" />
-          <div className="side-footer">本地工具箱 v0.2.2 · 本地运行</div>
-        </aside>
-
         <div className="main">
           <div className="statusbar">
             <span className="sb-left">

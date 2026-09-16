@@ -1,4 +1,4 @@
-# 🧹 本地工具箱 · Local Toolbox
+# 🧹 磁盘清理助手 · Disk Cleanup Assistant
 
 <div align="center">
 
@@ -22,13 +22,12 @@
 - **Safety first**: every deletion requires manual selection + a confirmation dialog; files go to the Recycle Bin (`send2trash`) by default, protected paths (`Windows`, `Program Files`, `ProgramData`…) are rejected twice (UI disabled + backend guard).
 - **Smart cache cleanup**: a built-in knowledge base lists cache directories for browsers, chat apps, dev tools and system updates — each entry explains what it is, the impact of deleting it, and a recommendation/risk level.
 - **Directory encyclopedia**: 75+ common Windows/software directories documented with purpose, attached-app info and deletion advice.
-- **Extensible platform**: add new tools without modifying the platform core.
 
 ---
 
-一个 Windows 桌面「工具平台」：Electron + React + TypeScript 前端，Python FastAPI 后端，
-通过 `127.0.0.1` 本地 HTTP 通信。当前内置第一个工具：**磁盘清理助手**；以后可以不断加入更多工具，
-无需改动平台骨架。
+一个 Windows 桌面**磁盘清理专用工具**：Electron + React + TypeScript 前端，Python FastAPI 后端，
+通过 `127.0.0.1` 本地 HTTP 通信。扫描全盘文件，按用途智能分类并给出删除建议，
+勾选后安全移入回收站释放空间——所有数据都留在本机。
 
 ## 安全红线（已落实）
 - 删除必须用户手动勾选 + 弹窗二次确认，后端不提供任何“自动删除”。
@@ -98,7 +97,8 @@
 ## 自定义协议唤起（local-toolbox://）
 - `electron/main.js`：单实例锁 + `app.setAsDefaultProtocolClient("local-toolbox")` + 二次启动聚焦窗口。
 - `package.json` → `build.protocols` 声明 `local-toolbox`，NSIS 安装时注册协议关联，
-  网页（如门户站悬浮按钮）可一键唤起已安装的本地工具箱软件。
+  网页可一键唤起已安装的磁盘清理助手软件。
+- 协议名沿用历史的 `local-toolbox`（技术标识，改动会破坏已安装用户的注册表关联）。
 
 ## 平台架构
 ```
@@ -143,7 +143,7 @@ npx electron-builder --win nsis
 pytest → 前端 typecheck/构建 → PyInstaller 后端 → electron-builder NSIS，提供两条路径：
 
 - **发版**：推送 `v*` 形式的 tag，构建成功后安装包自动附到对应 Release。
-  资产名固定为 ASCII 的 `LocalToolbox-Setup-<version>.exe`，与软件内 electron-updater
+  资产名固定为 ASCII 的 `DiskCleanup-Setup-<version>.exe`，与软件内 electron-updater
   的更新源、下载页的动态版本脚本三者的约定保持一致。
 - **验证**：在 Actions 页手动触发 `workflow_dispatch`，只产出 artifact 供下载试用，
   不触碰 Release。
@@ -170,23 +170,10 @@ pytest → 前端 typecheck/构建 → PyInstaller 后端 → electron-builder N
 **更新源**：`package.json` 的 `publish` 为 generic provider，指向
 `https://gh-proxy.com/<GitHub releases/latest/download>` —— 国内网络无法直连 `api.github.com`
 与 `github.com`，必须经镜像才可达。主源不可用时，主进程会依次回退到 `ghproxy.net` 与
-GitHub 直连（见 `electron/main.js` 的 `FALLBACK_FEEDS`）。
+GitHub 直连（见 `electron/main.js` 的 `UPDATE_FEEDS`）。
 
 本地调试：`app.isPackaged` 为 false 时界面会提示"开发模式下不检查更新"；如需在开发模式
 走通完整流程，可在项目根放一个 `dev-app-update.yml`（已 gitignore）。
-
-## 如何新增一个工具
-后端：把 `backend/tools/_template_tool.py` 复制为 `backend/tools/<id>.py`，
-实现路由并导出 `TOOL = ToolSpec(...)`（id / name / icon / include_router），平台会自动发现。
-
-前端：把 `src/tools/_template/` 复制为 `src/tools/<id>/`，实现默认导出组件，
-再在 `src/tools/registry.tsx` 用 `lazy()` 登记一条 `ToolEntry`。
-
-约定：
-- 每个前端工具独立懒加载分包，互不影响。
-- 每个后端工具独立 `APIRouter`，可单独开关。
-- 删除类操作复用 `backend/core/delete_manager.py` 的回收站能力与保护白名单。
-- 平台型接口（盘符、全局配置）放 `backend/api/routes_system.py`，所有工具共用。
 
 ## 测试
 ```powershell
@@ -277,6 +264,6 @@ npm run dist:azure
 npm run verify:azure-env
 ```
 
-说明：electron-builder 会**自动安装** PowerShell 模块 `TrustedSigning`（首次需要联网）并调用 `Invoke-TrustedSigning` 完成 SHA256 + 时间戳签名，产物仍是 `release\LocalToolbox-Setup-<version>.exe`。
+说明：electron-builder 会**自动安装** PowerShell 模块 `TrustedSigning`（首次需要联网）并调用 `Invoke-TrustedSigning` 完成 SHA256 + 时间戳签名，产物仍是 `release\DiskCleanup-Setup-<version>.exe`。
 
 > 建议安装 **PowerShell 7（pwsh）**，Trusted Signing 在 pwsh 下最稳定；仅装了 Windows PowerShell 5.1 时也能自动回退使用。

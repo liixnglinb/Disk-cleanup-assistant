@@ -100,7 +100,7 @@ function scheduleStartupCheck() {
 
       if (Notification.isSupported()) {
         new Notification({
-          title: "本地工具箱有新版本",
+          title: "磁盘清理助手有新版本",
           body: `v${latest} 已发布，可在「设置 → 关于 → 软件更新」中一键更新。`,
         }).show();
       }
@@ -178,7 +178,7 @@ if (!gotLock) {
       minHeight: 640,
       backgroundColor: "#F9F9FB",
       icon: path.join(__dirname, "..", "build", "icons", "icon.ico"),
-      title: "本地工具箱",
+      title: "磁盘清理助手",
       webPreferences: {
         preload: path.join(__dirname, "preload.js"),
         contextIsolation: true,

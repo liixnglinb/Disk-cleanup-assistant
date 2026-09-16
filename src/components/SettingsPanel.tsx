@@ -384,11 +384,10 @@ export default function SettingsPanel() {
             <>
               <SectionTitle title="关于" />
               <div style={{ padding: "6px 0" }}>
-                <div className="setting-label">本地工具箱 v{update.status !== "idle" && update.status !== "checking" && update.status !== "error" ? update.info.current : "0.2.2"}</div>
+                <div className="setting-label">磁盘清理助手 v{update.status !== "idle" && update.status !== "checking" && update.status !== "error" ? update.info.current : "0.3.0"}</div>
                 <div className="setting-desc" style={{ marginTop: 8, lineHeight: 1.7 }}>
-                  内置工具：磁盘清理助手（深度文件分析 + 出厂检测 + AI 辅助 + 安全回收站删除）。
+                  深度文件分析 + 出厂检测 + AI 辅助 + 安全回收站删除，所有数据留在本机。
                   <br />架构：Electron + React + TypeScript + Python FastAPI（本地 127.0.0.1 通信、自动端口）。
-                  <br />扩展：在 src/tools/registry.tsx 与 backend/tools/ 中登记即可新增工具。
                 </div>
               </div>
 

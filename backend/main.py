@@ -19,7 +19,7 @@ from .api import routes_system
 from .core.config import APP_NAME
 from .platform import platform, router as tools_router, setup_tools
 
-app = FastAPI(title="本地工具箱", version=__version__)
+app = FastAPI(title="磁盘清理助手", version=__version__)
 
 _api_token = os.environ.get('DCA_API_TOKEN', '').strip()
 

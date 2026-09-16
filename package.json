@@ -1,7 +1,7 @@
 {
   "name": "disk-cleanup-assistant",
-  "productName": "本地工具箱",
-  "version": "0.2.2",
+  "productName": "磁盘清理助手",
+  "version": "0.3.0",
   "description": "Windows 磁盘清理助手（Electron + FastAPI）",
   "author": "local-tools",
   "private": true,
@@ -39,7 +39,7 @@
   },
   "build": {
     "appId": "com.localtools.diskcleanup",
-    "productName": "本地工具箱",
+    "productName": "磁盘清理助手",
     "electronLanguages": [
       "zh_CN",
       "en_US"
@@ -63,7 +63,7 @@
       "target": [
         "nsis"
       ],
-      "artifactName": "LocalToolbox-Setup-${version}.${ext}",
+      "artifactName": "DiskCleanup-Setup-${version}.${ext}",
       "icon": "build/icons/icon.ico"
     },
     "nsis": {
@@ -72,7 +72,7 @@
       "createDesktopShortcut": true,
       "perMachine": false,
       "createStartMenuShortcut": true,
-      "shortcutName": "本地工具箱",
+      "shortcutName": "磁盘清理助手",
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false,
       "installerLanguages": [
@@ -97,7 +97,7 @@
     "compression": "maximum",
     "protocols": [
       {
-        "name": "本地工具箱",
+        "name": "磁盘清理助手",
         "schemes": [
           "local-toolbox"
         ]
