@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, Notification } = require("electron");
 const crypto = require("crypto");
 const path = require("path");
 const { autoUpdater } = require("electron-updater");
@@ -19,19 +19,24 @@ function send(channel, payload) {
 // ---------------------------------------------------------------------------
 // 自动更新（electron-updater，electron-builder 官方配套更新器）
 // ---------------------------------------------------------------------------
-// 主源写在 package.json 的 publish 里，构建时由 electron-builder 写入
-// resources/app-update.yml。下面几个备用源用于主源不可达时回退——它们都指向
-// GitHub Releases 的 latest 通道，因此拿到的始终是最新版本的 latest.yml 与安装包。
-// 实测（2026-09-15，国内网络）：gh-proxy 与 ghfast.top 直接返回内容；
-// ghproxy.net 会 302 到自身的 /https:// 路径；github.com 直连不可达。
-const FALLBACK_FEEDS = [
+// 主源须与 package.json 的 build.publish 保持一致（构建时会写入 resources/app-update.yml）。
+// 代码里再写一份是有意的：每次检查前都要显式设定 feed，否则某次主源失败切到备用源后，
+// 后续检查会一直沿用那个备用源，即便主源已经恢复。
+const PRIMARY_FEED =
+  "https://gh-proxy.com/https://github.com/liixnglinb/Disk-cleanup-assistant/releases/latest/download";
+
+// 备用源按实测可达性排序（2026-09-15，国内网络）：ghfast.top 直接返回内容；
+// ghproxy.net 会 302 到自身 /https:// 路径；github.com 直连不可达，留给海外或带代理的用户。
+// 四者都指向 latest 通道，因此拿到的始终是最新版本的 latest.yml 与安装包。
+const UPDATE_FEEDS = [
+  PRIMARY_FEED,
   "https://ghfast.top/https://github.com/liixnglinb/Disk-cleanup-assistant/releases/latest/download",
   "https://ghproxy.net/https://github.com/liixnglinb/Disk-cleanup-assistant/releases/latest/download",
   "https://github.com/liixnglinb/Disk-cleanup-assistant/releases/latest/download",
 ];
 
 autoUpdater.autoDownload = false; // 由用户在界面确认后再下载
-autoUpdater.autoInstallOnAppQuit = false; // 下载完成后由用户点「重启并安装」
+autoUpdater.autoInstallOnAppQuit = true; // 用户未点「重启并安装」时，退出应用也会完成安装
 autoUpdater.allowDowngrade = false;
 
 autoUpdater.on("download-progress", (p) => {
@@ -62,18 +67,47 @@ function versionGt(a, b) {
 }
 
 async function checkWithFallback() {
-  const feeds = [null, ...FALLBACK_FEEDS]; // null = 沿用 app-update.yml 中的主源
   let lastError = "无法连接更新服务，请检查网络后重试";
-  for (const feed of feeds) {
-    if (feed) autoUpdater.setFeedURL({ provider: "generic", url: feed });
+  for (const feed of UPDATE_FEEDS) {
+    autoUpdater.setFeedURL({ provider: "generic", url: feed });
     try {
       const result = await autoUpdater.checkForUpdates();
-      if (result && result.updateInfo) return { ok: true, result };
+      if (result && result.updateInfo) return { ok: true, result, feed };
     } catch (err) {
       lastError = String((err && err.message) || err);
     }
   }
   return { ok: false, error: lastError };
+}
+
+/** 启动后静默检查一次；发现新版本时发系统通知，并同步给界面（不自动下载）。 */
+function scheduleStartupCheck() {
+  if (!app.isPackaged) return;
+  setTimeout(async () => {
+    try {
+      const r = await checkWithFallback();
+      if (!r.ok) return;
+      const info = r.result.updateInfo;
+      const latest = String(info.version || "").replace(/^v/, "");
+      if (!versionGt(latest, app.getVersion())) return;
+
+      const payload = {
+        latest,
+        current: app.getVersion(),
+        releaseDate: info.releaseDate || "",
+      };
+      send("update:available", payload);
+
+      if (Notification.isSupported()) {
+        new Notification({
+          title: "本地工具箱有新版本",
+          body: `v${latest} 已发布，可在「设置 → 关于 → 软件更新」中一键更新。`,
+        }).show();
+      }
+    } catch {
+      /* 启动检查失败不打扰用户 */
+    }
+  }, 5000);
 }
 
 ipcMain.handle("update:check", async () => {
@@ -169,6 +203,9 @@ if (!gotLock) {
     });
   }
 
+  // 与 build.appId 保持一致；Windows 上的系统通知依赖它
+  app.setAppUserModelId("com.localtools.diskcleanup");
+
   app.whenReady().then(async () => {
     let apiToken = null;
     try {
@@ -182,6 +219,7 @@ if (!gotLock) {
     }
     const port = backendHandle ? backendHandle.port : 17650;
     createWindow(port, apiToken);
+    scheduleStartupCheck();
 
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow(port, apiToken);

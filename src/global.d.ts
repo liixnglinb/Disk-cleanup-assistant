@@ -26,6 +26,9 @@ interface DcaBridge {
   checkUpdate: () => Promise<UpdateCheckResult>;
   downloadUpdate: () => Promise<UpdateActionResult>;
   installUpdate: () => Promise<UpdateActionResult>;
+  onUpdateAvailable: (
+    cb: (i: { latest: string; current: string; releaseDate?: string }) => void,
+  ) => () => void;
   onUpdateProgress: (cb: (p: UpdateProgress) => void) => () => void;
   onUpdateDownloaded: (cb: (i: { version: string }) => void) => () => void;
   onUpdateError: (cb: (e: { message: string }) => void) => () => void;

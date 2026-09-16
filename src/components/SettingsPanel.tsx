@@ -177,10 +177,28 @@ export default function SettingsPanel() {
       setDlErr(e.message);
       setUpdate((prev) => (prev.status === "downloading" ? { status: "has", info: prev.info } : prev));
     });
+    // 主进程在启动后会静默检查一次；发现新版本时把界面直接切到「可更新」状态
+    const offAvailable = window.dca.onUpdateAvailable((i) => {
+      setUpdate((prev) =>
+        prev.status === "idle"
+          ? {
+              status: "has",
+              info: {
+                ok: true,
+                latest: i.latest,
+                current: i.current,
+                hasUpdate: true,
+                releaseDate: i.releaseDate,
+              },
+            }
+          : prev,
+      );
+    });
     return () => {
       offProgress();
       offDownloaded();
       offError();
+      offAvailable();
     };
   }, []);
 
