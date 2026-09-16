@@ -85,7 +85,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           files: |
-            release/LocalToolbox-Setup-*.exe
+            release/DiskCleanup-Setup-*.exe
             release/latest.yml
             release/*.blockmap
           generate_release_notes: true
