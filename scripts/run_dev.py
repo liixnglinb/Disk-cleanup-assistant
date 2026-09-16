@@ -1,5 +1,10 @@
 """Dev server: pick a free port and start uvicorn."""
+import os
 import sys
+
+# 以 `python scripts/run_dev.py` 直接运行时，sys.path[0] 是 scripts/ 目录本身，
+# 会导致 import backend 失败（ModuleNotFoundError）。这里把项目根目录补进去。
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def _pick_port():
     for arg in sys.argv[1:]:
