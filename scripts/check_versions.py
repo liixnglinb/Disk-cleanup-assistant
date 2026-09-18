@@ -28,8 +28,8 @@ TEXT_TARGETS = [
     ("backend/platform.py", r'version:\s*str\s*=\s*"([^"]+)"'),
     ("backend/tools/disk_cleanup.py", r'__version__\s*=\s*"([^"]+)"'),
     ("backend/tools/_template_tool.py", r'__version__\s*=\s*"([^"]+)"'),
-    ("src/tools/registry.tsx", r'version:\s*"([^"]+)"'),
-    ("src/components/Shell.tsx", r"v(\d+\.\d+\.\d+)"),
+    # 前端只保留这一处：Shell 的版本号已改为 vite define 注入（__APP_VERSION__，源即
+    # package.json），registry.tsx 已随多工具平台机制移除——两者都不再是独立落点。
     ("src/components/SettingsPanel.tsx", r'"(\d+\.\d+\.\d+)"'),
 ]
 
@@ -65,6 +65,16 @@ def main() -> int:
     for name, version in entries:
         mark = " " if not version.startswith("<") else "!"
         print(f"  {mark} {name.ljust(width)}  {version}")
+
+    # 落点读取失败必须直接判失败：否则删改文件会让校验目标静默落空，
+    # 脚本仍打印「N 处一致」并返回成功，形成假通过。
+    failed = [name for name, v in entries if v.startswith("<")]
+    if failed:
+        print(f"\n以下落点读取失败（文件缺失或正则未匹配），校验无法完成：")
+        for name in failed:
+            print(f"  - {name}")
+        print("请修正文件或更新 TEXT_TARGETS，不要放过期目标。")
+        return 1
 
     if len(versions) != 1:
         print(f"\n版本号不一致，共发现 {len(versions)} 个不同值: {sorted(versions)}")
