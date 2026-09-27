@@ -21,7 +21,7 @@
 - **材质**：面板 = surface 色阶 + 顶部 1px 内高光 + `--shadow-sm`；表格行不卡片化；浮层才用 `--shadow` / `--shadow-lg`。
 - **窗口**：本阶段不用 `frame: false`，也不用 `Menu.setApplicationMenu(null)`。
 - **更新策略**：渠道移除 ghproxy.net；`autoInstallOnAppQuit = false`；`autoDownload` 保持 false 但在 `update-available` 里显式下载；测速必须校验**真实收到的字节数**，不得用 `Content-Length` 或耗时推断（本项目曾因 `curl -o /dev/null` 假报 0 字节误判"三个镜像全瘫"）。
-- **版本号 8 处一致**：`npm run check:versions` 必须退出 0。
+- **版本号 7 处一致**：`npm run check:versions` 必须退出 0。本计划把 `SettingsPanel.tsx` 改用 `__APP_VERSION__` 后，它不再是独立版本落点，须同步从 `scripts/check_versions.py` 的 `TEXT_TARGETS` 移除（8 → 7 处，见 Task 5 Step 5b，理由：Shell 与 registry.tsx 改用注入后即按同一规则移除过）。**注意用 `.venv/Scripts/python.exe` 跑该脚本，本机 `python` 不在 PATH。**
 - **提交信息**：中文 + conventional 前缀（`feat(scope):` / `fix(scope):` / `chore(scope):`）。
 - **改动前记录**：任何文件改动前先跑一次 `npm run typecheck` 与 `pytest backend/tests -q` 留基线（本计划基线：typecheck 通过、pytest **37 passed**）。
 
@@ -1033,7 +1033,9 @@ git commit -m "feat(shell): 自绘标题栏 + 48px 左侧导航栏，删除状�
 - Modify: `src/App.tsx`（把占位 Provider 换成真实实现）
 - Modify: `src/components/SettingsPanel.tsx`（删除局部更新状态机，改消费 store）
 - Modify: `src/components/ConfirmDialog.tsx`（支持通用确认）
-- Modify: `electron/main.js`（启动推送补 releaseNotes、显式下载、退出静默安装改 false）
+- Modify: `electron/main.js`（启动推送补 releaseNotes、显式下载 + 去重闸门、退出静默安装改 false）
+- Modify: `scripts/check_versions.py`（移除 SettingsPanel 落点，8 → 7 处）
+- Modify: `README.md:154`（"10 处" → "7 处"）
 
 **Interfaces:**
 - Consumes: `window.dca.checkUpdate/downloadUpdate/installUpdate/onUpdateAvailable/onUpdateProgress/onUpdateDownloaded/onUpdateError`
@@ -1236,15 +1238,31 @@ autoUpdater.autoDownload = false;
 ```js
 autoUpdater.autoInstallOnAppQuit = false; // 必须由用户点「更新并重启」确认，退出时不静默安装
 ```
-3. 新增显式自动下载（放在 `autoUpdater.on("update-downloaded", ...)` 之后）：
+3. 新增显式自动下载（放在 `autoUpdater.on("update-downloaded", ...)` 之后）。**必须带去重闸门**：渲染层 1.5s 会主动补一次 `checkUpdate()`，主进程 5s 再查一次，两次都会触发 `update-available`，不加闸门可能对 89MB 安装包发起重复下载：
+
 ```js
-autoUpdater.on("update-available", async () => {
+// 去重闸门：同一版本只自动下载一次（渲染层与主进程各会触发一次 update-available）
+let downloadingVersion = null;
+let downloadedVersion = null;
+
+autoUpdater.on("update-available", async (info) => {
+  const v = String((info && info.version) || "");
+  if (!v || v === downloadingVersion || v === downloadedVersion) return;
+  downloadingVersion = v;
   try {
     await autoUpdater.downloadUpdate();
   } catch (err) {
+    downloadingVersion = null;
     send("update:error", { message: String((err && err.message) || err) });
   }
 });
+```
+
+并在 `autoUpdater.on("update-downloaded", ...)` 内、`send("update:downloaded", ...)` 上方加入两行：
+
+```js
+  downloadedVersion = downloadingVersion;
+  downloadingVersion = null;
 ```
 4. `scheduleStartupCheck()` 内的 payload 补 releaseNotes（`const payload = { latest, current, releaseDate }` 处）：
 ```js
@@ -1257,6 +1275,37 @@ autoUpdater.on("update-available", async () => {
       };
 ```
 5. `ipcMain.handle("update:check")` 返回值里 `releaseNotes: notes.slice(0, 800)` 改为 `notes.slice(0, 2000)`。
+
+- [ ] **Step 5b: 收尾版本落点（否则校验必失败）**
+
+`SettingsPanel.tsx` 不再含字面版本号后，`scripts/check_versions.py` 里针对它的正则必然"未匹配"，而该脚本被设计成"落点读不到即返回 1"（防假通过），会让后续 `npm run check:versions` 直接失败。
+
+1. 删除 `scripts/check_versions.py` 中 `TEXT_TARGETS` 的最后一项：
+
+```python
+    # 前端只保留这一处：Shell 的版本号已改为 vite define 注入（__APP_VERSION__，源即
+    # package.json），registry.tsx 已随多工具平台机制移除——两者都不再是独立落点。
+    ("src/components/SettingsPanel.tsx", r'"(\d+\.\d+\.\d+)"'),
+```
+
+替换为：
+
+```python
+    # 前端已无独立版本落点：Shell 与 SettingsPanel 的版本号都由 vite define 注入
+    # （__APP_VERSION__，源即 package.json），registry.tsx 随多工具平台机制移除。
+```
+
+2. `README.md:154` 把"校验 10 处版本号是否一致"改为"校验 7 处版本号是否一致"。
+
+3. 验证：
+
+Run: `./.venv/Scripts/python.exe scripts/check_versions.py; echo "exit=$?"`
+Expected: 打印 `全部 7 处版本号一致: 0.3.0`，`exit=0`
+
+- [ ] **Step 5c: 类型检查与构建**
+
+Run: `npm run typecheck && npm run build:renderer`
+Expected: 均无错误
 
 - [ ] **Step 6: 样式**
 
