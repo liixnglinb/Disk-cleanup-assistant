@@ -286,14 +286,37 @@ if (!gotLock) {
 
   function killBackendTree() {
     if (!backendHandle || !backendHandle.child) return;
-    const pid = backendHandle.child.pid;
+    // 先把子进程句柄取出来：backendHandle 马上要被置空，兜底分支还要用它。
+    const child = backendHandle.child;
+    const pid = child.pid;
+    const killChild = () => {
+      try {
+        child.kill();
+      } catch (_) {
+        /* ignore */
+      }
+    };
+    // 先置空再动手，保证三处钩子（before-quit / will-quit / process.on("exit")）幂等：
+    // 只有第一次调用真正清理，后续调用直接返回。
     backendHandle = null;
     if (!pid) return;
+    if (process.platform !== "win32") {
+      // 非 Windows 上 taskkill 不存在，直接杀子进程。
+      killChild();
+      return;
+    }
     try {
-      // child.kill() 在 Windows 上不保证杀子树；taskkill /T 连子进程一起收
-      require("child_process").execFile("taskkill", ["/PID", String(pid), "/T", "/F"], () => {});
+      // 尽力而为（不是可靠保障）：taskkill /T 能连子进程一起收，dev 下后端是
+      // python.exe → python.exe 两级，只 kill 一级不够。但本函数也会在
+      // process.on("exit") 里跑，退出期做异步 execFile 不可靠（可能来不及执行），
+      // 所以它只是兜底清理；真正的可靠保障由后续任务的父进程看门狗负责。
+      require("child_process").execFile("taskkill", ["/PID", String(pid), "/T", "/F"], (err) => {
+        // taskkill 不存在（ENOENT）或执行失败（非零退出）时，退回 child.kill()
+        // 至少收掉直接子进程，避免留孤儿。
+        if (err) killChild();
+      });
     } catch (_) {
-      /* ignore */
+      killChild();
     }
   }
 
