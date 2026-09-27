@@ -26,11 +26,14 @@ interface UpdateActionResult {
 interface DcaBridge {
   platform: string;
   getApiToken: () => string | null;
+  toggleMaximize: () => Promise<{ maximized: boolean }>;
+  setTitleBarOverlay: (theme: "light" | "dark") => Promise<{ ok: boolean }>;
+  onMaximizedChanged: (cb: (m: { maximized: boolean }) => void) => () => void;
   checkUpdate: () => Promise<UpdateCheckResult>;
   downloadUpdate: () => Promise<UpdateActionResult>;
   installUpdate: () => Promise<UpdateActionResult>;
   onUpdateAvailable: (
-    cb: (i: { latest: string; current: string; releaseDate?: string }) => void,
+    cb: (i: { latest: string; current: string; releaseDate?: string; releaseNotes?: string }) => void,
   ) => () => void;
   onUpdateProgress: (cb: (p: UpdateProgress) => void) => () => void;
   onUpdateDownloaded: (cb: (i: { version: string }) => void) => () => void;

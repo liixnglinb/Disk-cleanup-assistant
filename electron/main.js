@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, Notification } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, Notification, Menu } = require("electron");
 const crypto = require("crypto");
 const path = require("path");
 const { autoUpdater } = require("electron-updater");
@@ -182,15 +182,22 @@ if (!gotLock) {
       height: 820,
       minWidth: 980,
       minHeight: 640,
-      backgroundColor: "#F9F9FB",
-      icon: path.join(__dirname, "..", "build", "icons", "icon.ico"),
       title: "磁盘清理助手",
+      icon: path.join(__dirname, "..", "build", "icons", "icon.ico"),
+      // 保留原生 NC 区（贴边吸附/缩放交给系统），仅隐藏标题栏并自绘同一行内容。
+      // 不用 frame:false —— 那会丢掉系统吸附行为，且需自补缩放命中区。
+      titleBarStyle: "hidden",
+      titleBarOverlay: { color: "#F7F7F5", symbolColor: "#16161A", height: 34 },
+      backgroundColor: "#EFEFED",
       webPreferences: {
         preload: path.join(__dirname, "preload.js"),
         contextIsolation: true,
         nodeIntegration: false,
       },
     });
+
+    mainWindow.on("maximize", () => send("win:maximized-changed", { maximized: true }));
+    mainWindow.on("unmaximize", () => send("win:maximized-changed", { maximized: false }));
 
     const devUrl = process.env.ELECTRON_START_URL;
     const query = { backend: String(port), apiToken };
@@ -199,6 +206,9 @@ if (!gotLock) {
     } else {
       mainWindow.loadFile(path.join(__dirname, "..", "dist", "index.html"), { query });
     }
+
+    mainWindow.setAutoHideMenuBar(true);
+    mainWindow.setMenuBarVisibility(false);
 
     // 外部链接一律交给系统浏览器，不在应用内新开窗口
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -211,6 +221,44 @@ if (!gotLock) {
 
   // 与 build.appId 保持一致；Windows 上的系统通知依赖它
   app.setAppUserModelId("com.localtools.diskcleanup");
+
+  // 只保留标准编辑加速器（role 自带 accelerator），隐藏菜单栏。
+  // 不调用 Menu.setApplicationMenu(null)：官方未说明它是否连带失去 Ctrl+C/V。
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      {
+        label: "编辑",
+        submenu: [
+          { role: "undo", label: "撤销" },
+          { role: "redo", label: "重做" },
+          { type: "separator" },
+          { role: "cut", label: "剪切" },
+          { role: "copy", label: "复制" },
+          { role: "paste", label: "粘贴" },
+          { role: "selectAll", label: "全选" },
+        ],
+      },
+    ]),
+  );
+
+  ipcMain.handle("win:toggle-maximize", () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return { maximized: false };
+    if (mainWindow.isMaximized()) mainWindow.unmaximize();
+    else mainWindow.maximize();
+    return { maximized: mainWindow.isMaximized() };
+  });
+
+  ipcMain.handle("win:set-titlebar-overlay", (_e, theme) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return { ok: false };
+    const dark = theme === "dark";
+    mainWindow.setTitleBarOverlay({
+      color: dark ? "#17181C" : "#F7F7F5",
+      symbolColor: dark ? "#EDEEF1" : "#16161A",
+      height: 34,
+    });
+    mainWindow.setBackgroundColor(dark ? "#101114" : "#EFEFED");
+    return { ok: true };
+  });
 
   app.whenReady().then(async () => {
     let apiToken = null;
@@ -236,14 +284,20 @@ if (!gotLock) {
     if (process.platform !== "darwin") app.quit();
   });
 
-  app.on("will-quit", () => {
-    if (backendHandle && backendHandle.child) {
-      try {
-        backendHandle.child.kill();
-      } catch (_) {
-        /* ignore */
-      }
-      backendHandle = null;
+  function killBackendTree() {
+    if (!backendHandle || !backendHandle.child) return;
+    const pid = backendHandle.child.pid;
+    backendHandle = null;
+    if (!pid) return;
+    try {
+      // child.kill() 在 Windows 上不保证杀子树；taskkill /T 连子进程一起收
+      require("child_process").execFile("taskkill", ["/PID", String(pid), "/T", "/F"], () => {});
+    } catch (_) {
+      /* ignore */
     }
-  });
+  }
+
+  app.on("before-quit", killBackendTree);
+  app.on("will-quit", killBackendTree);
+  process.on("exit", killBackendTree);
 }

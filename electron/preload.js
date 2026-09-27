@@ -14,6 +14,11 @@ contextBridge.exposeInMainWorld("dca", {
     return token || null;
   },
 
+  // ---- 窗口控制（标题栏由渲染层自绘，按钮由系统 overlay 绘制）----
+  toggleMaximize: () => ipcRenderer.invoke("win:toggle-maximize"),
+  setTitleBarOverlay: (theme) => ipcRenderer.invoke("win:set-titlebar-overlay", theme),
+  onMaximizedChanged: (cb) => subscribe("win:maximized-changed", cb),
+
   // ---- 自动更新（electron-updater）----
   checkUpdate: () => ipcRenderer.invoke("update:check"),
   downloadUpdate: () => ipcRenderer.invoke("update:download"),
