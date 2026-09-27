@@ -33,7 +33,8 @@
 - 建立焦点层级（唯一英雄位）、语义色系统、克制的材质语言。
 - 高密度数据表基线（24px 行高 / 12px 字），批量操作常驻化。
 - 抽出面板共性（骨架、设置订阅、确认弹窗），删除死代码与平台化遗留。
-- 修掉 §9 列出的 6 个 bug。
+- 修掉 §9 列出的 7 个 bug。
+- 更新交互重做：真测速选渠道、标题栏常驻下载框、悬停显示更新内容、确认后重启安装（§16）。
 
 **非目标（明确不做）**
 - 不引入组件库、不引入 Tailwind、不改构建链。
@@ -252,7 +253,7 @@ OverviewPanel:7、DiskCleanupTool:18）改指 `store/settings.ts`。
 
 ---
 
-## 9. 必须修的 6 个 bug
+## 9. 必须修的 7 个 bug
 
 | # | 现象 | 根因（实测/代码定位） | 修法 |
 |---|---|---|---|
@@ -264,6 +265,8 @@ OverviewPanel:7、DiskCleanupTool:18）改指 `store/settings.ts`。
 | 6 | 装机版退出残留后端进程（实测 PID 8868 RSS 1.1GB，主进程已消失） | `electron/main.js:233` `will-quit` 仅 `child.kill()`，Windows 下不保证杀树 | 改用 `process_tree_kill`（`taskkill /T /F /PID`）+ 子进程 `detached:false`；退出前调后端 `/api/shutdown`；`before-quit` 与 `process.on('exit')` 双保险 |
 
 bug-6 需真机验证：启动装机版→退出→`netstat -ano | grep 1765` 应无 LISTENING。
+
+| 7 | 启动时的更新检查结果会丢失：停在概览页时收到推送，之后打开设置只显示 idle | 更新状态与事件监听都在 `SettingsPanel` 内（`:197-202` 挂载才注册），而该面板随页签卸载（`DiskCleanupTool.tsx:136` 条件渲染） | §16.5：更新状态上提到 `App` 顶层的 `UpdaterProvider` 常驻订阅，并在挂载时主动补一次 `checkUpdate()` 兜底 |
 
 ---
 
@@ -342,7 +345,7 @@ store/workspace(useWorkspace) ──► 导航 + 清理分段 + 筛选 + 检视�
 
 | 期 | 内容 | 可独立验收 |
 |---|---|---|
-| P1 | 外壳：main.js/preload/global.d.ts + Shell 重写 + NavRail + 删状态栏 + 删出厂检测全链路 | 窗口行为 + 截图 |
+| P1 | 外壳：main.js/preload/global.d.ts + Shell 重写 + NavRail + 删状态栏 + 删出厂检测全链路 + **更新交互重做（§16，与标题栏同批，因下载框就长在标题栏里）** | 窗口行为 + 截图 + §16.6 更新链路 |
 | P2 | token：语义色/材质/密度/`color-scheme` + WorkspaceHeader + StatBar + Skeleton | 概览与暗色断言 |
 | P3 | 清理工作区：DataTable + 三分段 + InspectorDrawer + 全局搜索 | 2.4M 行实测 |
 | P4 | 概览英雄位（含 bug-1）+ 软件 + 设置页重做 + 日志抽屉 | 截图 |
@@ -386,3 +389,69 @@ P5 的同步边界（用户级规矩，2026-09-27）：
   不做展开态，故不影响。
 - 所有 §7 数字均为源码声明值，未在本机 125%/150% DPI 下实测落地像素。
 - 缓存条目 `app` 字段 → 注册表软件名的归一化匹配率：需实测，匹配不上者走字母徽标。
+
+---
+
+## 16. 更新交互重做（2026-09-27 追加，用户明确要求）
+
+### 16.0 合规对照（现行实现逐条审计结论）
+
+| 用户要求 | 现状 | 判定 |
+|---|---|---|
+| 支持 GitHub 直连 + 国内镜像 | `main.js:31-36` 四条渠道齐全 | ✅ |
+| 自动识别哪个快就用哪个 | `checkWithFallback()`（`main.js:69-81`）是**固定顺序 failover**，无任何测速 → ghfast.top(1.54MB/s) 永远轮不到，36KB/s 的 ghproxy.net 稳居第三位 | ❌ |
+| 有更新时在固定位置显示 | 仅 `设置→关于`（`SettingsPanel.tsx:394-442`，随页签卸载），启动只发 Windows 系统通知 | ❌ |
+| 进入软件显示不带箭头的下载框 + 进度 | 不存在；进度条只在设置页文字流里（`:412`），且需手动点"下载更新" | ❌ |
+| 悬停显示更新内容 | 无 hover；releaseNotes 仅手动 `update:check` 才返回（`main.js:122-129`），启动推送不带（`:94-99`） | ❌ |
+| 更新完成后点击 → 提示"是否现在更新并重启" → 确认后自动更新重启 | `quitAndInstall(true,true)` 静默安装正确（`:142-146`），但按钮直连 `installUpdate()`（`SettingsPanel.tsx:431`）**无二次确认**；且点击载体不存在 | ⚠️ |
+
+### 16.1 渠道选择：真测速（替代固定顺序）
+
+- `UPDATE_FEEDS` **移除 `ghproxy.net`**（实测 36 KB/s，Voyra 文档 §7.7 早已标注"应从下载选项中移除"）。保留：gh-proxy、ghfast.top、GitHub 直连。
+- 新增 `probeFeeds()`：对每个源的 `latest.yml` 发起 **`Range: bytes=0-262143`（256KB）采样**请求，实测吞吐后按速度降序排序，取最快者 `setFeedURL`。
+  - 并发发起、单源超时 3s；失败源直接排除，不参与排序。
+  - **必须校验真实收到的字节数**，不能用 `Content-Length` 或耗时推断——本项目已在 Git Bash 下踩过"`curl -o /dev/null` 假报 0 字节，据此误判三个镜像全瘫"的坑（Voyra 文档 §7.7 测速方法坑）。测速内部用 `net.request` 累计 data 事件长度。
+  - 结果缓存：同一会话内 10 分钟 TTL，避免每次检查都测。
+- 全部源都失败时，回退到固定顺序（gh-proxy → ghfast.top → 直连），并在错误里说明"测速失败，已按默认顺序尝试"。
+
+### 16.2 常驻下载框（标题栏右端固定位置）
+
+- 位置：标题栏右端、主题按钮左侧（§2.4 已预留）。**无更新时不渲染、不占位。**
+- 形态：28×28 圆角 8 的方块，**不得出现下载箭头图标**（避免被当成"下载按钮"）。三态：
+  | 状态 | 外观 |
+  |---|---|
+  | 发现新版（已自动开始下载） | 方块 + 品牌色描边，中心显示 `v0.4.0` 之类版本号（11px） |
+  | 下载中 | 方块本身作进度指示：环形进度（`conic-gradient`）填充，中心显示整数百分比 |
+  | 下载完成 | 方块转 `--ok` 绿，中心换 `check` 图标（`icons.tsx` 已有），轻微脉冲一次 |
+- 通道与设置页"关于"共用同一状态源（§16.5），不出现两处状态不一致。
+
+### 16.3 悬停显示更新内容
+
+- 不用原生 `title`（样式不可控），自绘浮层：`--shadow` + `--radius-lg`，宽 ≤ 400px，内容 = 版本号 + 发布日期 + releaseNotes（最多 12 行，超出滚动），底部一行"点击查看更新并重启"。
+- **修复数据源**：`main.js:94-99` 的启动推送 payload 补上 `releaseNotes`（取自 `updateInfo.releaseNotes`）；`main.js:122-129` 的 800 字截断保留，但浮层需完整内容 → 推送与 `update:check` 统一返回最多 2000 字，超出以省略号收尾。
+
+### 16.4 更新与重启流程
+
+```
+发现新版 → 自动开始下载（不询问） → 进度显示在方块上
+  → 下载完成 → 点击方块 → ConfirmDialog「是否现在更新并重启？」
+    → 确认 → window.dca.installUpdate() → quitAndInstall(true, true) → 自动重启进入新版
+    → 取消 → 方块保持绿色完成态，可稍后再点
+```
+- `autoUpdater.autoDownload` 保持 **false**，改为在 `update-available` 事件里**显式**调 `downloadUpdate()`：这样测速（§16.1）可以插在检查与下载之间，也便于在测速失败时给出明确错误。
+- `autoInstallOnAppQuit` 改为 **false**。理由：用户要求"确认后才更新并重启"，而它会在正常退出时静默安装，与该要求直接冲突（现行 `main.js:39` 为 true）。
+- `allowDowngrade` 保持 false。
+
+### 16.5 状态机上提（修 bug-7）
+
+- 新增 `src/store/updater.tsx`：`UpdaterProvider` 挂在 `App`（`src/App.tsx:17`）顶层，**常驻**订阅 4 个事件（`update:available` / `progress` / `downloaded` / `error`），并在挂载后主动调一次 `checkUpdate()` 兜底——避免主进程 5 秒静默检查的推送早于渲染层订阅而丢失。
+- 标题栏方块、设置页"关于"、`ConfirmDialog` 全部消费 `useUpdater()`，删除 `SettingsPanel` 内的局部状态机（`:170-243`）。
+- `checkUpdate` 在 `app.isPackaged === false` 时仍返回"开发模式不检查更新"，但**方块不因此报错**，只在设置页显示该提示。
+
+### 16.6 更新链路验证方式（真机、可复现）
+
+1. 主进程在 `!app.isPackaged` 时设 `autoUpdater.forceDevUpdateConfig = true`，读仓库根 `dev-app-update.yml`（已 gitignore）。
+2. 本地起静态服务（`python -m http.server 17800`）托管：`latest.yml`（版本号写成比当前高的值）+ **真实复用已发布的 `DiskCleanup-Setup-0.3.0.exe`**（真包才能过 sha512 校验与进度采样）。
+3. 逐项断言：测速排序日志（哪个源被选中、各源实测 KB/s）→ 方块出现并显示版本 → 自动下载 → 方块百分比推进 → 悬停浮层显示版本/日期/说明 → 点击弹出"是否现在更新并重启？" → 取消后仍可再点。
+4. **最后一步"确认→重启安装"只在真机确认时执行一次**（会真的装上 0.3.0）。开发验证阶段到"确认弹窗出现"为止，不点确认。
+5. 反例断言：把 `dev-app-update.yml` 指向不存在的地址 → 方块不出现、设置页显示可读错误、软件其余功能不受影响。
