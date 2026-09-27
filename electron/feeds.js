@@ -21,11 +21,13 @@ function parseLatestYml(text) {
 
 /**
  * 按实测吞吐排序。吞吐 = bytes / ms。
- * bytes=0 或 ms=0 的"成功"响应用户视角等于没拿到数据，判为失败 —— 本机曾因
- * `curl -o /dev/null` 假报 0 字节而误判三个镜像全瘫。
+ * bytes 小于 minBytes、或 ms=0 的"成功"响应用户视角等于没拿到完整数据，判为失败 ——
+ * 本机曾因 `curl -o /dev/null` 假报 0 字节而误判三个镜像全瘫；反过来，镜像对不存在
+ * 的资产返回的短错误页（约 40KB、边缘缓存 ~100ms）会靠"小字节 ÷ 小耗时"伪装成最快，
+ * 故需要 minBytes 完整性下限（默认 1，即只堵 0 字节那一侧）。
  */
-function rankFeeds(probes) {
-  const measured = probes.filter((p) => p.ok && p.bytes > 0 && p.ms > 0);
+function rankFeeds(probes, { minBytes = 1 } = {}) {
+  const measured = probes.filter((p) => p.ok && p.bytes >= minBytes && p.ms > 0);
   const bySpeed = measured
     .slice()
     .sort((a, b) => b.bytes / b.ms - a.bytes / a.ms)

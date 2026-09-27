@@ -48,6 +48,18 @@ test("rankFeeds 把 bytes=0 的成功响应判为失败（防假报 0 字节）"
   assert.equal(r.measured, 1);
 });
 
+test("rankFeeds 短响应不得因字节少÷耗时少而胜出", () => {
+  const r = rankFeeds(
+    [
+      { feed: "a", ok: true, bytes: 40960, ms: 100 },   // 假高速：短错误页
+      { feed: "b", ok: true, bytes: 262144, ms: 1739 }, // 真实样本
+    ],
+    { minBytes: 262144 },
+  );
+  assert.equal(r.fastest, "b");
+  assert.equal(r.measured, 1);
+});
+
 test("rankFeeds 全失败时回退原顺序（= FEEDS 顺序）", () => {
   const probes = FEEDS.map((f) => ({ feed: f.url, ok: false, bytes: 0, ms: 3000 }));
   const r = rankFeeds(probes);
