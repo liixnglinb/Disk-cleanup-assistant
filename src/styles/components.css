@@ -31,9 +31,14 @@
 .titlebar-section { font-size: var(--fs-sm); color: var(--text-muted); }
 .titlebar-drag { flex: 1 1 auto; height: 100%; }
 .titlebar-actions { display: flex; align-items: center; gap: 2px; }
-/* 给系统 overlay 按钮区留位：Windows 上约 138px / 缩放比，用 env() 兜底 */
-.titlebar-overlay-gap { width: env(titlebar-area-width, 138px); flex: none; }
+/* 给系统 overlay 按钮区留位。不要用 env(titlebar-area-width)：那个变量是"留给网页的
+   区域宽度"（本机实测 ≈1144），不是按钮区宽度；一旦它真的解析出来会把内容挤爆。
+   按钮区在 Windows 上是固定 138px（100% 缩放），更高缩放比下按 devicePixelRatio 走系统。 */
+.titlebar-overlay-gap { width: 138px; flex: none; }
 .titlebar-scan { display: flex; align-items: center; gap: var(--space-2); }
+/* 标题栏只有 34px，控件必须各自收窄，否则 select 会用全局 32px 顶满整条 */
+.titlebar-scan select { height: 26px; font-size: var(--fs-sm); padding-block: 0; }
+.titlebar-scan .btn { height: 26px; }
 .titlebar-progress {
   position: relative; width: 90px; height: 4px; border-radius: var(--radius-full);
   background: var(--surface-hover); overflow: hidden;

@@ -1,14 +1,10 @@
 import React from "react";
 import TitleBar from "./TitleBar";
 import NavRail from "./NavRail";
-import { useScan } from "../store/ScanContext";
 
 export default function Shell({ children }: { children: React.ReactNode }) {
-  const { status } = useScan();
-  const running = status?.status === "running" || status?.status === "starting";
-
   return (
-    <div className={`app ${running ? "is-scanning" : ""}`}>
+    <div className="app">
       <TitleBar />
       <div className="workspace">
         <NavRail />

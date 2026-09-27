@@ -17,8 +17,13 @@ export default function TitleBar() {
 
   useEffect(() => window.dca?.onMaximizedChanged?.((m) => setMaximized(m.maximized)), []);
 
-  const onDoubleClick = () => {
-    window.dca?.toggleMaximize?.().then((r) => setMaximized(r.maximized));
+  const onDoubleClick = (e: React.MouseEvent) => {
+    // no-drag 只挡 OS 拖拽，不挡 DOM 冒泡：双击扫描按钮/下拉/动作按钮会冒到这里。
+    // drag 区本身由系统原生处理双击最大化，React 事件不会冒上来。
+    if ((e.target as HTMLElement).closest("button, select, input, a, [role='button']")) return;
+    window.dca?.toggleMaximize?.()
+      .then((r) => setMaximized(r.maximized))
+      .catch(() => {});
   };
 
   return (
@@ -32,6 +37,7 @@ export default function TitleBar() {
       <ScanControl />
       <div className="titlebar-drag" />
       <div className="titlebar-actions no-drag">
+        <UpdateBox />
         <button className="icon-btn" title="目录百科搜索" onClick={() => setSection("kb")}>
           <Icon name="search" size={16} />
         </button>
