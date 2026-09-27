@@ -24,10 +24,10 @@
       CTA / 激活态 / 焦点上（60-30-10 中的那个 10）。
    ===========================================================================*/
 :root {
+  color-scheme: light;
   /* ================= 背景色阶（页面底 → 卡片 → 输入） ================= */
   --bg: #EFEFED;
   --bg-elevated: #F7F7F5;
-  --sidebar-bg: #F7F7F5;
   --surface: #FCFCFA;
   --surface-hover: #F1F1EF;
   --input-bg: #FFFFFF;
@@ -85,6 +85,7 @@
   --fs-lg: 16px;    /* 分节标题、页面标题 */
   --fs-xl: 20px;    /* 主要数值 */
   --fs-2xl: 26px;   /* 概览大数字 */
+  --fs-hero: 40px;   /* 概览英雄位数字 */
 
   /* ================= 行高 ================= */
   --lh-tight: 1.25;   /* 标题 */
@@ -114,9 +115,8 @@
   --dur-slow: 0.34s;
 
   /* ================= 尺寸 ================= */
-  --topbar-h: 48px;
-  --statusbar-h: 30px;
-  --sidebar-w: 204px;
+  --titlebar-h: 34px;
+  --nav-rail-w: 48px;
   --content-pad: 24px;
 
   /* ================= 阴影（仅用于浮层；卡片层次靠 surface + border） ================= */
@@ -132,9 +132,9 @@
    暗色：不是浅色的反转。底色抬高、正文降白以消除光晕，语义色略降饱和。
    ===========================================================================*/
 [data-theme="dark"] {
+  color-scheme: dark;
   --bg: #101114;
   --bg-elevated: #17181C;
-  --sidebar-bg: #17181C;
   --surface: #1C1E22;
   --surface-hover: #24262B;
   --input-bg: #212328;
@@ -284,10 +284,7 @@ a:hover { text-decoration: underline; }
 /* 物理按压反馈：可点控件按下时轻微下沉（2.5%） */
 .btn:active:not(:disabled),
 .icon-btn:active:not(:disabled),
-.side-item:active:not(:disabled),
-.tool-tab:active:not(:disabled),
-.switch:active .knob,
-.mtool-card:active:not(:disabled) { transform: scale(0.975); }
+.switch:active .knob { transform: scale(0.975); }
 
 /* 进度条 */
 .progress-bar {
@@ -311,8 +308,5 @@ a:hover { text-decoration: underline; }
     transition-duration: 0.01ms !important;
   }
   .btn:active:not(:disabled),
-  .icon-btn:active:not(:disabled),
-  .side-item:active:not(:disabled),
-  .tool-tab:active:not(:disabled),
-  .mtool-card:hover:not(:disabled) { transform: none; }
+  .icon-btn:active:not(:disabled) { transform: none; }
 }

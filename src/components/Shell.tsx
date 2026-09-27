@@ -1,99 +1,18 @@
-import React, { useEffect, useState } from "react";
-import { api } from "../api/client";
-import { formatBytes } from "../utils/format";
-import { useTheme } from "../hooks/useTheme";
-import Icon from "./icons";
-import type { DriveInfo } from "../types";
+import React from "react";
+import TitleBar from "./TitleBar";
+import NavRail from "./NavRail";
+import { useScan } from "../store/ScanContext";
 
-export interface StatusInfo {
-  kind: "idle" | "running" | "paused" | "ok" | "warn";
-  label: string;
-  right?: string;
-}
-
-function deriveStatusInfo(st: any): StatusInfo {
-  const files = st?.files_count ?? 0;
-  const cur = st?.current_path || "";
-  switch (st?.status) {
-    case "running":
-    case "starting":
-      return { kind: "running", label: `正在扫描：${files.toLocaleString()} 个文件`, right: cur };
-    case "paused":
-      return { kind: "warn", label: `扫描已暂停（已扫描 ${files.toLocaleString()} 个文件）`, right: "已暂停" };
-    case "completed":
-      return { kind: "ok", label: `扫描完成 · 共 ${files.toLocaleString()} 个文件`, right: "" };
-    case "cancelled":
-      return { kind: "warn", label: "扫描已取消，可重新开始", right: "" };
-    case "error":
-      return { kind: "warn", label: "扫描出错：" + (st?.message || "未知错误"), right: "" };
-    default:
-      return { kind: "idle", label: "就绪", right: "" };
-  }
-}
-
-function TopbarDrives() {
-  const [drives, setDrives] = useState<DriveInfo[]>([]);
-  useEffect(() => {
-    api.drives().then((r) => setDrives(r.items)).catch(() => {});
-  }, []);
-  if (drives.length === 0) return null;
-  return (
-    <div className="topbar-drives">
-      {drives.map((d) => {
-        const used = Math.max(0, d.total - d.free);
-        const pct = d.total > 0 ? Math.min(100, Math.round((used / d.total) * 100)) : 0;
-        const tone = pct >= 90 ? "full" : pct >= 75 ? "high" : "";
-        return (
-          <div className="topbar-drive" key={d.drive} title={`${d.label || d.drive} 已用 ${formatBytes(used)} / ${formatBytes(d.total)}`}>
-            <span className="num">{d.drive.replace(":", "")}</span>
-            <span className={`db ${tone}`}><i style={{ width: `${pct}%` }} /></span>
-            <span className="num dim">{pct}%</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-export default function Shell({ statusInfo, children }: { statusInfo: StatusInfo; children: React.ReactNode }) {
-  const { theme, toggleTheme } = useTheme();
-  const [liveScan, setLiveScan] = useState<any>(null);
-  useEffect(() => {
-    const h = (e: any) => setLiveScan(e.detail);
-    window.addEventListener("ltb-scan-status", h);
-    return () => window.removeEventListener("ltb-scan-status", h);
-  }, []);
-  const resolved: StatusInfo = liveScan ? deriveStatusInfo(liveScan) : statusInfo;
+export default function Shell({ children }: { children: React.ReactNode }) {
+  const { status } = useScan();
+  const running = status?.status === "running" || status?.status === "starting";
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <div className="topbar-brand" title={`磁盘清理助手 v${__APP_VERSION__}`}>
-          <div className="topbar-logo"><Icon name="eraser" size={16} /></div>
-          <div className="topbar-brand-text">
-            <span className="topbar-title">磁盘清理助手</span>
-          </div>
-        </div>
-        <TopbarDrives />
-        <div className="topbar-spacer" />
-        <div className="topbar-actions">
-          <button className="icon-btn" title={theme === "dark" ? "切换到浅色主题" : "切换到深色主题"} onClick={toggleTheme}>
-            <Icon name={theme === "dark" ? "sun" : "moon"} size={16} />
-          </button>
-        </div>
-      </header>
-
+    <div className={`app ${running ? "is-scanning" : ""}`}>
+      <TitleBar />
       <div className="workspace">
-        <div className="main">
-          <div className="statusbar">
-            <span className="sb-left">
-              <span className={`sb-dot ${resolved.kind}`} />
-              <span>{resolved.label}</span>
-            </span>
-            {resolved.right && <span className="sb-right" title={resolved.right}>{resolved.right}</span>}
-          </div>
-          <div className="content">{children}</div>
-        </div>
+        <NavRail />
+        <div className="content">{children}</div>
       </div>
     </div>
   );
