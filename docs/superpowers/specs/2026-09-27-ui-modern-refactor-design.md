@@ -262,7 +262,7 @@ OverviewPanel:7、DiskCleanupTool:18）改指 `store/settings.ts`。
 | 3 | 列头"文件名 / 所属软件"与独立"所属软件"列重复 | `FileTable.tsx:328` vs `:330` | 第一列改"文件"，归属只留独立列 |
 | 4 | 「删除前创建还原点」在重复文件清理里无效 | `DuplicatesPanel.tsx:49` 调 `api.deleteFiles(paths,false)`，不传 `restore_point`（`client.ts:91`） | 统一走 `store/settings` + ConfirmDialog，传 `restore_point` |
 | 5 | 改大文件阈值后高亮/筛选/列模板不更新 | 5 个面板渲染期直读 `loadSettings()`、`useMemo(…,[])` 无订阅 | `useSettings()` 订阅 |
-| 6 | 装机版退出残留后端进程（实测 PID 8868 RSS 1.1GB，主进程已消失） | `electron/main.js:233` `will-quit` 仅 `child.kill()`，Windows 下不保证杀树 | 改用 `process_tree_kill`（`taskkill /T /F /PID`）+ 子进程 `detached:false`；退出前调后端 `/api/shutdown`；`before-quit` 与 `process.on('exit')` 双保险 |
+| 6 | 装机版退出残留后端进程（实测 PID 8868 RSS 1.1GB，主进程已消失） | `electron/main.js:233` `will-quit` 仅 `child.kill()`；且实测两个孤儿进程对应的 Electron 主进程**已完全不存在**，说明主进程是被强杀/崩溃退出的，`will-quit` 根本没跑到 | 两层：① 主进程侧 `will-quit` + `before-quit` 用 `taskkill /T /F /PID` 杀树取代 `child.kill()`；② **后端侧新增父进程看门狗**（`--parent-pid`，每 3s 检测父进程是否存活，消失即自退）——这才是覆盖"主进程被强杀"的唯一手段。**不加 `/api/shutdown`**：该端点不存在（实测 grep 零命中），为一次 kill 特意加 HTTP 端点不划算 |
 
 bug-6 需真机验证：启动装机版→退出→`netstat -ano | grep 1765` 应无 LISTENING。
 
@@ -438,6 +438,12 @@ P5 的同步边界（用户级规矩，2026-09-27）：
     → 确认 → window.dca.installUpdate() → quitAndInstall(true, true) → 自动重启进入新版
     → 取消 → 方块保持绿色完成态，可稍后再点
 ```
+
+**交互闸门（2026-09-27 与用户逐字确认）**：
+- 进入软件即自动检测（`scheduleStartupCheck`，启动后 5s），发现新版**立即自动下载**，不询问。
+- 下载中点击方块**不触发任何动作**（`cursor: default`）；悬停浮层的文案负责解释原因（"正在下载 45%"）。
+- **仅"下载完成"态可点**，点击后**直接**弹「是否现在更新并重启？」，中间不再插入任何页面或第二次确认。
+- 因此代码上：`onClick` 必须有 `if (state.phase !== "ready") return` 的闸门，且非 ready 态不设 pointer 光标。
 - `autoUpdater.autoDownload` 保持 **false**，改为在 `update-available` 事件里**显式**调 `downloadUpdate()`：这样测速（§16.1）可以插在检查与下载之间，也便于在测速失败时给出明确错误。
 - `autoInstallOnAppQuit` 改为 **false**。理由：用户要求"确认后才更新并重启"，而它会在正常退出时静默安装，与该要求直接冲突（现行 `main.js:39` 为 true）。
 - `allowDowngrade` 保持 false。
