@@ -346,7 +346,15 @@ store/workspace(useWorkspace) ──► 导航 + 清理分段 + 筛选 + 检视�
 | P2 | token：语义色/材质/密度/`color-scheme` + WorkspaceHeader + StatBar + Skeleton | 概览与暗色断言 |
 | P3 | 清理工作区：DataTable + 三分段 + InspectorDrawer + 全局搜索 | 2.4M 行实测 |
 | P4 | 概览英雄位（含 bug-1）+ 软件 + 设置页重做 + 日志抽屉 | 截图 |
-| P5 | `store/settings` + ConfirmDialog 统一 + bug 2-6 + 死代码清理 + 版本号升 0.4.0 + README/文档同步 | §12 全绿 |
+| P5 | `store/settings` + ConfirmDialog 统一 + bug 2-6 + 死代码清理 + 版本号升 0.4.0 + 文档与网页同步 | §12 全绿 |
+
+P5 的同步边界（用户级规矩，2026-09-27）：
+- **必做**：`README.md` 与本 spec 一致；Voyra 下载页 `D:\Voyra 个人网站\public\local-toolbox\index.html`
+  同步到 v0.4.0（版本号 / 资产名 / 体积 / 功能文案 / 界面截图）。站上有对应网页而网页没跟上 = 没做完。
+- **先问再动**：`Voyra个人网站说明.md` 不主动重写（用户 2026-09-27 明确"那个文档你不用管了"，
+  且该目录只保留这一个文件、不创建任何备份）。但需向用户报告两处已证伪的描述：
+  §7.1「Electron 33（无边框自绘 UI）」为假（`electron/main.js:174` 未设 frame/titleBarStyle），
+  §7.1 形态描述里的"9 个功能页签"随本次重构失效。
 
 依赖：P2 的 token 是 P3/P4 的前提；P1 的 `useWorkspace` 是 P3 的前提。
 
