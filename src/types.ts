@@ -233,35 +233,3 @@ export interface AiAnalyzeResult {
   analyzed?: number;
   items: AiFileResult[];
 }
-
-export interface FactoryDevice {
-  manufacturer: string;
-  product: string;
-  brand: string;
-  arch: string;
-  chassis: string;
-  is_laptop: boolean;
-}
-
-export interface FactoryItem {
-  name: string;
-  path: string;
-  category: string;
-  description: string;
-  exists: boolean;
-  required: boolean;
-  severity: "high" | "low";
-  is_dir: boolean;
-}
-
-export interface FactoryCheckResult {
-  device: FactoryDevice;
-  items: FactoryItem[];
-  summary: {
-    total: number;
-    present: number;
-    missing: number;
-    missing_high: number;
-    healthy: boolean;
-  };
-}

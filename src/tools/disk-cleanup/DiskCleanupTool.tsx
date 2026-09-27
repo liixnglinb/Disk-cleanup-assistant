@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { api } from "../../api/client";
 import CachePanel from "../../components/CachePanel";
 import DuplicatesPanel from "../../components/DuplicatesPanel";
-import FactoryPanel from "../../components/FactoryPanel";
 import FileTable, { FileFilter } from "../../components/FileTable";
 import Icon from "../../components/icons";
 import KnowledgePanel from "../../components/KnowledgePanel";
@@ -22,7 +21,6 @@ const TABS = [
   { key: "files", label: "文件清理", icon: "file" },
   { key: "cache", label: "缓存清理", icon: "eraser" },
   { key: "kb", label: "目录百科", icon: "book" },
-  { key: "factory", label: "出厂检测", icon: "shield" },
   { key: "software", label: "软件管理", icon: "package" },
   { key: "duplicates", label: "重复文件", icon: "copy" },
   { key: "logs", label: "删除日志", icon: "log" },
@@ -130,7 +128,6 @@ function ToolScreen() {
         {tab === "kb" && <KnowledgePanel />}
         {tab === "software" && <SoftwarePanel />}
         {tab === "cache" && <CachePanel onOpenKb={() => setTab("kb")} />}
-        {tab === "factory" && <FactoryPanel />}
         {tab === "duplicates" && <DuplicatesPanel />}
         {tab === "logs" && <LogsPanel />}
         {tab === "settings" && <SettingsPanel />}

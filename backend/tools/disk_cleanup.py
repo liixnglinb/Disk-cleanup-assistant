@@ -6,7 +6,6 @@ from ..api import (
     routes_cache,
     routes_delete,
     routes_duplicates,
-    routes_factory,
     routes_files,
     routes_kb,
     routes_logs,
@@ -29,7 +28,6 @@ def _router() -> APIRouter:
         routes_duplicates.router,
         routes_logs.router,
         routes_kb.router,
-        routes_factory.router,
         routes_ai.router,
     ):
         r.include_router(rr)

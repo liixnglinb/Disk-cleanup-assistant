@@ -1,6 +1,6 @@
 import type {
   AiAnalyzeResult, AiConfig, AiPreset, AiTestResult, AppConfig, CacheCandidate,
-  CacheOverview, DeleteResult, DriveInfo, DuplicateResult, FactoryCheckResult,
+  CacheOverview, DeleteResult, DriveInfo, DuplicateResult,
   FileQueryResult, FolderKbItem, KbCategories, KbFoldersResult, LogEntry,
   ResidueResult, ScanStatus, ScanStatistics, SoftwareIconResult, SoftwareItem,
   ToolMeta,
@@ -147,5 +147,4 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ paths, with_signature }),
     }),
-  factoryCheck: () => request<FactoryCheckResult>("/api/factory/check"),
 };

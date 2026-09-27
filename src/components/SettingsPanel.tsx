@@ -386,7 +386,7 @@ export default function SettingsPanel() {
               <div style={{ padding: "6px 0" }}>
                 <div className="setting-label">磁盘清理助手 v{update.status !== "idle" && update.status !== "checking" && update.status !== "error" ? update.info.current : "0.3.0"}</div>
                 <div className="setting-desc" style={{ marginTop: 8, lineHeight: 1.7 }}>
-                  深度文件分析 + 出厂检测 + AI 辅助 + 安全回收站删除，所有数据留在本机。
+                  深度文件分析 + AI 辅助 + 安全回收站删除，所有数据留在本机。
                   <br />架构：Electron + React + TypeScript + Python FastAPI（本地 127.0.0.1 通信、自动端口）。
                 </div>
               </div>
