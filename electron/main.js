@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const path = require("path");
 const { autoUpdater } = require("electron-updater");
 const { startBackend } = require("./backend_runner");
+const { rankFeedsBySpeed } = require("./update_probe");
 
 // 自定义协议：网页可通过 local-toolbox:// 唤起本软件
 const PROTOCOL = "local-toolbox";
@@ -24,16 +25,6 @@ function send(channel, payload) {
 // 后续检查会一直沿用那个备用源，即便主源已经恢复。
 const PRIMARY_FEED =
   "https://gh-proxy.com/https://github.com/liixnglinb/Disk-cleanup-assistant/releases/latest/download";
-
-// 备用源按实测可达性排序（2026-09-15，国内网络）：ghfast.top 直接返回内容；
-// ghproxy.net 会 302 到自身 /https:// 路径；github.com 直连不可达，留给海外或带代理的用户。
-// 四者都指向 latest 通道，因此拿到的始终是最新版本的 latest.yml 与安装包。
-const UPDATE_FEEDS = [
-  PRIMARY_FEED,
-  "https://ghfast.top/https://github.com/liixnglinb/Disk-cleanup-assistant/releases/latest/download",
-  "https://ghproxy.net/https://github.com/liixnglinb/Disk-cleanup-assistant/releases/latest/download",
-  "https://github.com/liixnglinb/Disk-cleanup-assistant/releases/latest/download",
-];
 
 autoUpdater.autoDownload = false; // 由用户在界面确认后再下载
 autoUpdater.autoInstallOnAppQuit = true; // 用户未点「重启并安装」时，退出应用也会完成安装
@@ -66,9 +57,24 @@ function versionGt(a, b) {
   return false;
 }
 
+// 测速缓存：同一会话内 10 分钟不重复测（避免每次检查都跑 3 次采样）
+let speedCache = { at: 0, ranked: null, log: [] };
+const SPEED_TTL = 10 * 60 * 1000;
+
+async function resolveFeeds() {
+  if (speedCache.ranked && Date.now() - speedCache.at < SPEED_TTL) {
+    return { ranked: speedCache.ranked, log: [...speedCache.log, "（10 分钟内的测速缓存）"] };
+  }
+  const r = await rankFeedsBySpeed();
+  speedCache = { at: Date.now(), ranked: r.ranked, log: r.log };
+  return r;
+}
+
 async function checkWithFallback() {
+  const { ranked, log } = await resolveFeeds();
+  console.log("[update] 渠道测速：\n" + log.join("\n"));
   let lastError = "无法连接更新服务，请检查网络后重试";
-  for (const feed of UPDATE_FEEDS) {
+  for (const feed of ranked) {
     autoUpdater.setFeedURL({ provider: "generic", url: feed });
     try {
       const result = await autoUpdater.checkForUpdates();
