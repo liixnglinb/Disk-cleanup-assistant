@@ -388,6 +388,68 @@ P5 的同步边界（用户级规矩，2026-09-27）：
 - VS Code 侧栏默认宽度常量未定位到（grep 无果），240px 展开态为保守估值——本设计
   不做展开态，故不影响。
 - 所有 §7 数字均为源码声明值，未在本机 125%/150% DPI 下实测落地像素。
+
+---
+
+## 17. P1 收尾：分诊结论、延后项与未验证项（2026-09-28）
+
+P1（外壳 + 更新交互）已完成 6 个任务、14+1 个 commit。**全分支终审的独立子智能体席位因额度耗尽未能开启，
+终审由控制端自审完成** —— 这一条本身是流程缺陷，P2 起应在有额度时补一次独立终审。
+
+控制端自审发现并已修（commit `0f4fa29`）：
+1. `updater` 的 `hasUpdate === false` 分支仍无条件写 `latest` → 镜像缓存返回过期版本或 Release 回滚时，
+   已下载好的方块会消失、下次启动重下整包。与前两轮修掉的 `available`/`error` 覆盖 `ready` 是**同一类第三个洞**。
+2. `UpdateBox` 的 `install()` 无 try/catch → `quitAndInstall` 抛错时确认框已关、方块在 error 相位不渲染，
+   用户得不到任何反馈。现改为 toast。
+3. 启动系统通知文案仍指向旧交互（"设置 → 关于 → 软件更新 中一键更新"）。
+
+### 分诊：合并/发版前必须做（不是"修"，是"验"）
+
+| 项 | 为什么必须 |
+|---|---|
+| **8 项人工目视**：贴边吸附、Snap Layouts、`Win+方向键`、双击标题栏最大化、overlay 三按钮真实点击、125%/150% DPI 是否错位、Alt 不再唤出菜单栏、role 加速器真实键盘可用 | 本环境无人工目视条件；`titleBarOverlay` 的吸附行为 Electron 33 文档**零记载**，spec §14 风险 1 的回退方案（`frame:false` + 自补 3px 命中区）尚未排除 |
+| **打包版更新端到端**（真实 GitHub 源 + 真包） | 开发模式**无法**端到端验证：`checkWithFallback` 每次 `setFeedURL` 使 `dev-app-update.yml` 失效，且 `isPackaged===false` 时检查路径早退。P1 的验证用的是合成源 + 本地 HTTPS |
+| **打包版（PyInstaller onefile）看门狗路径** | bootloader→真实进程两级结构、`_MEI` 清理、`--parent-pid` 是否随 bootloader 传递，全部未验证 |
+| **现场 1.1GB 孤儿的成因定位** | 与"node 会连带收掉子进程"的实测行为矛盾；若孤儿来自不经 `backend_runner.js` 的启动路径，本次修复**不覆盖** |
+
+### 分诊：可留后续阶段（P2–P5）
+
+- **P2/P5 死代码**：`TitleBar` 的 `maximized` 只写不读；`ScanControl` 的 `drive-select` 空 hook；
+  `.stat-card.hero`/`.home-hero-cta`/`.home-logo` 等 18 个平台化时代死类；`--fs-hero` 目前零消费（P4 会用）；
+  `ScanContext` 的 `"ltb-scan-status"` 已成无监听者死事件。
+- **P4**：概览在 `statistics === null` 时显示"还没有扫描过磁盘"的**误导文案**（真因是该端点在 2.4M 文件上极慢，
+  见 §9 bug-1 的更正）。
+- **P2 文案批次**：更新失败显示 Chromium 原文（`net::ERR_CONNECTION_REFUSED`）且一次失败连发 3 条 `update:error`；
+  ready 态下手动复查失败完全不可见。
+- **加固（低概率、代价不对称）**：`win:set-titlebar-overlay` 无参数校验（非法值静默回落浅色并返回 `{ok:true}`）；
+  两个窗口 IPC 无 try/catch；`setAutoHideMenuBar` 保留单按 Alt 唤出"编辑"菜单；杀树在 PID 回收窗口期的理论误杀；
+  `scripts/run_dev.py` 与 `smoke_packaged.py` 不传 `--parent-pid` 故不受看门狗保护；
+  看门狗第 5 个用例依赖 CPython `Popen.wait()` 不关 `_handle` 的实现细节。
+- **文档**：`README.md` 已随 P1 同步；Voyra 主文档 §7.1「无边框自绘 UI」与「9 个功能页签」已失效、
+  §7.4/§7.8 的"8 处"应为 7 处 —— **按用户规矩先问再动**。
+
+### 分诊：设计边界，不必修
+
+- 父 PID 在 3s 轮询窗口内被系统复用 → 看门狗漏检（方向偏安全，是 brief 方案的固有限制）。
+- `os._exit(0)` 跳过 uvicorn 优雅关闭：行为变化是"批次删除停在中间"。WAL + 逐条审计日志保证不产生不一致半写状态，
+  是"不再留 1.1GB 孤儿"的必然代价。
+- `update:progress` 载荷不带版本号 → ready 期间若有新版本开始下载，浮层会短暂显示"旧版本号 + 新进度"，
+  由 `downloaded` 事件纠正。
+
+### 过程中被实测推翻的既有认知（记入档案）
+
+1. **计划里 Task 6 的验收方式是无效的**："杀 Electron 主进程 → 端口消失"在 Node/libuv 下**必然通过**
+   （父被强杀时子进程 <1s 被连带收掉，4 组对照含 2 组看门狗根本没启动的对照组同样如此）。
+   有效方法是**兄弟进程隔离法**（实验组 1.7s 自退 vs 对照组 22s+ 存活）。
+2. **文档"GitHub 直连不可达"只对大文件成立**：真实 Electron 下 `latest.yml` 三个源都能取到（350B）；
+   直连的失败体现在 1MB 采样 20s 超时（13–27 KB/s）。
+3. **概览"不恢复扫描"的原诊断是错的**：`ScanContext` 早已调 `recentScan()`；真因是统计端点慢 + 空态文案误导。
+   （控制端的 grep 用了 `scanRecent`，真实方法名是 `recentScan` → 模式写错就会得出"零命中"的假结论。）
+4. **`env(titlebar-area-width)` 语义反了**：它是"留给网页的宽度"（实测≈1144），不是按钮区宽度；
+   今天能用只因它在 Electron 桌面窗里未定义，一旦解析会挤爆布局 → 已改固定 138px。
+5. **`win.getTitleBarOverlay()` 在 Electron 33.4.11 不存在**（只有 setter）。
+6. **`node_modules/electron` 曾是坏的**（`dist/` 只剩许可证、`install.js` 静默 exit 0 但不产出 exe）；
+   已用缓存里的官方 zip 手工解压 + 写 `path.txt` 修好。
 - 缓存条目 `app` 字段 → 注册表软件名的归一化匹配率：需实测，匹配不上者走字母徽标。
 
 ---
