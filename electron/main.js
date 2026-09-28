@@ -42,7 +42,9 @@ autoUpdater.on("download-progress", (p) => {
 });
 
 autoUpdater.on("update-downloaded", (info) => {
-  downloadedVersion = downloadingVersion;
+  // 以事件里的 info.version 为准：downloadingVersion 记的是"开始下载时"的版本，
+  // 若下载途中又发布了新版本，两者会不一致，记错会让后续同版本检查重复下载整个安装包。
+  downloadedVersion = String((info && info.version) || downloadingVersion);
   downloadingVersion = null;
   send("update:downloaded", { version: (info && info.version) || "" });
 });
@@ -156,15 +158,6 @@ ipcMain.handle("update:check", async () => {
     releaseDate: info.releaseDate || "",
     releaseNotes: notes.slice(0, 2000),
   };
-});
-
-ipcMain.handle("update:download", async () => {
-  try {
-    await autoUpdater.downloadUpdate();
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, error: String((err && err.message) || err) };
-  }
 });
 
 ipcMain.handle("update:install", () => {

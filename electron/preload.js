@@ -21,7 +21,6 @@ contextBridge.exposeInMainWorld("dca", {
 
   // ---- 自动更新（electron-updater）----
   checkUpdate: () => ipcRenderer.invoke("update:check"),
-  downloadUpdate: () => ipcRenderer.invoke("update:download"),
   installUpdate: () => ipcRenderer.invoke("update:install"),
   onUpdateAvailable: (cb) => subscribe("update:available", cb),
   onUpdateProgress: (cb) => subscribe("update:progress", cb),

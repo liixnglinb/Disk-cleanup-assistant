@@ -158,22 +158,29 @@ pytest → 前端 typecheck/构建 → PyInstaller 后端 → electron-builder N
 
 使用 electron-builder 官方配套的 **electron-updater**。官方在 Windows 上仅支持 NSIS 目标，
 便携版（portable）不支持自动更新，因此分发形态确定为 **NSIS 用户级安装**
-（`oneClick: true` + `perMachine: false`，装到 `%LOCALAPPDATA%\Programs\`，无需管理员权限）。
+（`perMachine: false`，默认装到 `%LOCALAPPDATA%\Programs\`，无需管理员权限）。
 
 用户体验：首次双击安装包装一次，之后所有更新都在软件内完成 ——
-「设置 → 关于 → 软件更新」→ 检查更新 → 下载更新（带进度与速度）→ 重启并安装。
-安装由 `quitAndInstall(true, true)` 静默执行，不弹安装向导，等同原地更新。
+启动后主进程自动检查（含渠道测速），发现新版本**立即自动下载**：标题栏右端出现 28×28 的更新方块，
+下载中显示百分比进度环，悬停方块可查看版本号、发布日期与发布说明（过长可在浮层内滚动）。
+**下载完成后**点击方块 → 弹出「是否现在更新并重启？」→ 确认后由 `quitAndInstall(true, true)`
+静默安装并重启，不弹安装向导，等同原地更新。多份检查（渲染层补查、主进程启动检查）由主进程的
+去重闸门收敛成"同一版本只下载一次"；`autoInstallOnAppQuit` 为 `false` —— **退出时不会静默安装**，
+必须由用户在方块上确认。「设置 → 关于」显示的状态文案与方块同源，那里的「检查更新」按钮只做手动复查。
 
 **发布新版本必须上传 `latest.yml`**（连同 `*.blockmap`）：electron-updater 靠它比对版本、
 定位安装包并做增量下载；只上传 `.exe` 会导致更新检查直接失败。
 
 **更新源**：`package.json` 的 `publish` 为 generic provider，指向
 `https://gh-proxy.com/<GitHub releases/latest/download>` —— 国内网络无法直连 `api.github.com`
-与 `github.com`，必须经镜像才可达。主源不可用时，主进程会依次回退到 `ghproxy.net` 与
-GitHub 直连（见 `electron/main.js` 的 `UPDATE_FEEDS`）。
+与 `github.com`，必须经镜像才可达。每次检查前主进程都会按测速结果重设 feed，候选渠道见
+`electron/feeds.js` 的 `FEEDS`（gh-proxy → ghfast.top → github 直连；测速全失败时按此顺序回退）。
 
-本地调试：`app.isPackaged` 为 false 时界面会提示"开发模式下不检查更新"；如需在开发模式
-走通完整流程，可在项目根放一个 `dev-app-update.yml`（已 gitignore）。
+本地调试：`main.js` 在 `!app.isPackaged` 时打开 `autoUpdater.forceDevUpdateConfig`，项目根的
+`dev-app-update.yml`（已 gitignore）是官方 dev 通道的配置文件。但**开发模式无法端到端验证更新
+链路**：`checkWithFallback()` 每次检查前都会 `setFeedURL`，electron-updater 一旦设过 feed 就不再读
+`dev-app-update.yml`；叠加 `isPackaged === false` 时 `update:check` 与启动静默检查都会提前返回，
+开发模式只会显示"开发模式下不检查更新"。更新链路的真实验收只能在打包产物上做。
 
 ## 测试
 ```powershell

@@ -30,7 +30,6 @@ interface DcaBridge {
   setTitleBarOverlay: (theme: "light" | "dark") => Promise<{ ok: boolean }>;
   onMaximizedChanged: (cb: (m: { maximized: boolean }) => void) => () => void;
   checkUpdate: () => Promise<UpdateCheckResult>;
-  downloadUpdate: () => Promise<UpdateActionResult>;
   installUpdate: () => Promise<UpdateActionResult>;
   onUpdateAvailable: (
     cb: (i: { latest: string; current: string; releaseDate?: string; releaseNotes?: string }) => void,

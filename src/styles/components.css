@@ -695,7 +695,14 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
 }
 
 /* ---------------- 更新方块（固定位置：标题栏右端） ---------------- */
-.update-box-wrap { position: relative; display: inline-flex; align-items: center; }
+/* padding-bottom + 负 margin：方块位置分毫不动（负 margin 让外框照旧 28px、标题栏居中不变），
+   但 wrap 的几何范围向下多出 6px，正好盖住"方块 → 浮层"的视觉空隙。否则指针穿过空隙时
+   React 的 onMouseLeave（按 DOM 包含判定）立刻卸载浮层，浮层里的滚动条永远够不着。
+   浮层随之改成 top:100%（贴着 wrap 盒的下缘，视觉间距仍由这 6px padding 给出）。 */
+.update-box-wrap {
+  position: relative; display: inline-flex; align-items: center;
+  padding-bottom: 6px; margin-bottom: -6px;
+}
 .update-box {
   width: 28px; height: 28px; padding: 0; border: 1px solid var(--border-strong);
   border-radius: 8px; background: var(--surface); color: var(--text);
@@ -709,7 +716,7 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
 }
 .update-box.is-ready { border-color: var(--ok); background: var(--ok-soft); color: var(--ok); cursor: pointer; }
 .update-pop {
-  position: absolute; top: calc(100% + 6px); right: 0; z-index: 90;
+  position: absolute; top: 100%; right: 0; z-index: 90;
   width: 360px; max-width: 70vw; padding: var(--space-3);
   border: 1px solid var(--border); border-radius: var(--radius-lg);
   background: var(--surface); box-shadow: var(--shadow);

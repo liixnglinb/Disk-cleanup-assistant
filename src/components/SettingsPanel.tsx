@@ -81,7 +81,7 @@ function Toggle({ on, onChange, label, desc, warn }: {
 
 export default function SettingsPanel() {
   const { theme, toggleTheme } = useTheme();
-  const { state: update, check: checkUpdate, install: installUpdate } = useUpdater();
+  const { state: update, check: checkUpdate } = useUpdater();
   const [settings, setSettings] = useState<AppSettings>(loadSettings);
   const [section, setSection] = useState<SectionKey>("general");
 

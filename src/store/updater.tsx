@@ -18,6 +18,27 @@ interface UpdaterCtx {
 
 const Ctx = createContext<UpdaterCtx | null>(null);
 
+/** 归一化版本号（容忍 v 前缀与空值）。 */
+function normVersion(v?: string): string {
+  return String(v ?? "").replace(/^v/, "");
+}
+
+/**
+ * 条件升级的判据：当前已处于 ready / downloading，且说的是同一个版本。
+ *
+ * ready 被同版本的 available 覆盖 → 方块从"可点"退回"准备下载"，安装入口消失；而
+ * autoInstallOnAppQuit 已改 false（退出不安装）→ 用户永远拿不到"确认后更新并重启"。
+ * downloading 被覆盖 → 进度态倒退（虽会自愈，但同为状态倒退，一并守住）。
+ *
+ * 两条触发路径都真实存在：① 下载完成后在「设置 → 关于」点「检查更新」，update:check 以
+ * 仍在运行的旧版本算 hasUpdate:true；② 主进程 5s 启动推送晚于下载完成。
+ */
+function keepRunningPhase(prev: UpdateState, latest?: string): boolean {
+  if (prev.phase !== "ready" && prev.phase !== "downloading") return false;
+  const a = normVersion(prev.latest);
+  return a !== "" && a === normVersion(latest);
+}
+
 export function UpdaterProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<UpdateState>({ phase: "idle" });
 
@@ -26,16 +47,20 @@ export function UpdaterProvider({ children }: { children: React.ReactNode }) {
       setState({ phase: "error", error: "当前环境不支持自动更新（仅桌面版可用）" });
       return;
     }
-    setState((p) => ({ ...p, phase: "checking" }));
+    // 已有 ready / downloading 时不退回 checking：一是避免方块瞬间消失，
+    // 二是下面的条件升级要以"检查前的状态"为准，退回 checking 会把判据抹掉。
+    setState((p) => (keepRunningPhase(p, p.latest) ? p : { ...p, phase: "checking" }));
     try {
       const r = await window.dca.checkUpdate();
       if (!r.ok) {
         setState({ phase: "error", error: r.error || "检查更新失败" });
         return;
       }
-      setState(
+      setState((p) =>
         r.hasUpdate
-          ? { phase: "available", latest: r.latest, current: r.current, releaseDate: r.releaseDate, releaseNotes: r.releaseNotes }
+          ? keepRunningPhase(p, r.latest)
+            ? p
+            : { phase: "available", latest: r.latest, current: r.current, releaseDate: r.releaseDate, releaseNotes: r.releaseNotes }
           : { phase: "latest", latest: r.latest, current: r.current },
       );
     } catch (e) {
@@ -48,7 +73,11 @@ export function UpdaterProvider({ children }: { children: React.ReactNode }) {
     if (!window.dca) return;
     const offs = [
       window.dca.onUpdateAvailable((i) =>
-        setState({ phase: "available", latest: i.latest, current: i.current, releaseDate: i.releaseDate, releaseNotes: i.releaseNotes }),
+        setState((p) =>
+          keepRunningPhase(p, i.latest)
+            ? p
+            : { phase: "available", latest: i.latest, current: i.current, releaseDate: i.releaseDate, releaseNotes: i.releaseNotes },
+        ),
       ),
       window.dca.onUpdateProgress((p) => setState((s) => ({ ...s, phase: "downloading", percent: p.percent }))),
       window.dca.onUpdateDownloaded((i) => setState((s) => ({ ...s, phase: "ready", latest: i.version || s.latest, percent: 100 }))),
