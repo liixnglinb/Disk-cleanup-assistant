@@ -55,7 +55,7 @@ function waitHealth(port, timeoutMs = 30000) {
 async function startBackend(apiToken) {
   const port = await findFreePort();
   const { exe, args } = resolveBackend();
-  const child = spawn(exe, [...args, `--port=${port}`], {
+  const child = spawn(exe, [...args, `--port=${port}`, `--parent-pid=${process.pid}`], {
     stdio: "ignore",
     windowsHide: true,
     env: { ...process.env, ...(apiToken ? { DCA_API_TOKEN: apiToken } : {}) },
