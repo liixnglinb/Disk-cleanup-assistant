@@ -9,9 +9,13 @@
 
 </div>
 
-> 一个 Windows 桌面「工具平台」：Electron + React + TypeScript 前端，Python FastAPI 后端，通过 `127.0.0.1` 本地 HTTP 通信。当前内置第一个工具：**磁盘清理助手**；以后可以不断加入更多工具，无需改动平台骨架。
+> 一个 Windows 桌面**磁盘清理专用工具**：Electron + React + TypeScript 前端，Python FastAPI 后端，
+> 通过 `127.0.0.1` 本地 HTTP 通信。扫描全盘文件，按用途智能分类并给出删除建议，
+> 勾选后安全移入回收站释放空间——所有数据都留在本机。
 >
-> **A Windows desktop "tool platform"** — Electron + React + TypeScript frontend with a Python FastAPI backend talking over local `127.0.0.1` HTTP. Ships with its first tool, **Disk Cleanup Assistant**; more tools can be added without touching the platform skeleton.
+> **A Windows desktop disk-cleanup tool** — Electron + React + TypeScript frontend with a Python
+> FastAPI backend talking over local `127.0.0.1` HTTP. Scans the whole drive, classifies files by
+> purpose, and frees space by moving user-selected files to the Recycle Bin. All data stays local.
 
 [在线下载页](https://lxlrwxs.top/local-toolbox/) · [Releases](https://github.com/liixnglinb/Disk-cleanup-assistant/releases)
 
@@ -100,17 +104,34 @@
   网页可一键唤起已安装的磁盘清理助手软件。
 - 协议名沿用历史的 `local-toolbox`（技术标识，改动会破坏已安装用户的注册表关联）。
 
-## 平台架构
+## 界面外壳与信息架构（2026-09-28 重构）
 ```
-Electron 外壳
-├── 后端平台 backend/platform.py       资源注册中心（ToolSpec / 自动发现）
-│   ├── backend/tools/<tool>.py        每个工具一个后端模块
-│   └── GET /api/tools                 列出已安装工具
-├── 前端平台 src/tools/registry.tsx    前端工具注册中心（懒加载）
-│   ├── src/tools/<tool>/              每个工具一个前端面板
-│   └── 首页仪表盘 / 通用导航（按注册表渲染）
-└── 通用组件：主题、按钮、弹窗、表格、虚拟滚动
+Electron 窗口（titleBarStyle: hidden + 系统绘制按钮 overlay，高 34px）
+├── 标题栏（一行内）：品牌 · 当前工作区名 · 盘符选择 + 开始/暂停扫描 + 真实进度
+│                     · 目录百科抽屉 · 删除日志抽屉 · 更新方块 · 主题 · 系统按钮
+├── 左侧导航栏 48px：概览 / 清理 / 软件 / 设置   （原 9 个横向页签已废除）
+│   ├── 概览   —— 唯一英雄位「可释放 X GB」+ 主 CTA，其余降为次级元数据
+│   ├── 清理   —— 分段容器：缓存 / 文件 / 重复 三个来源
+│   ├── 软件   —— 已装软件 + 残留
+│   └── 设置   —— 单栏全展开（通用/扫描/AI/安全/关于），无内层侧栏
+└── 右侧抽屉（420px，z-index 90）：删除日志、目录百科
+    目录百科不再是并列页签，而是与缓存/文件同源的知识视图
+
+后端：backend/platform.py 资源注册中心（ToolSpec / 自动发现）
+      backend/tools/<tool>.py 每个工具一个后端模块；GET /api/tools 列出已注册工具
+      （注：前端的工具注册机制 src/tools/registry.tsx 已随产品收窄删除）
 ```
+
+**设计 token**（`src/styles/global.css`）：密度 `--row-h 24 / --head-h 28 / --field-h 26`、
+字号 `--fs-xs 11 / --fs-table 12 / --fs-base 13 / --fs-hero 40`、语义色四轴
+（`--ok` 可释放·推荐·低风险 / `--warn` 谨慎·中风险 / `--danger` 锁定·系统·危险 /
+`--primary` 仅 CTA·激活·焦点）。行内状态一律「图标着色 + 中性文字」，彩色胶囊只用于聚合计数。
+`color-scheme` 按主题分别声明，保证原生控件（输入框、复选框、下拉）跟随深浅色。
+
+**自动更新**：进软件自动检测 → 自动下载（标题栏方块显示进度，无下载箭头）→
+悬停看版本与发布说明 → **下载完成后**点击方块 → 「是否现在更新并重启？」→ 确认后静默安装并重启。
+渠道按实测吞吐择优（两阶段：探 `latest.yml` 取资产名 → 对安装包做 256KB `Range` 采样），
+全部失败时按默认顺序回退。详见「自动更新」一节。
 
 ## 运行（开发）
 ```powershell
@@ -184,7 +205,7 @@ pytest → 前端 typecheck/构建 → PyInstaller 后端 → electron-builder N
 
 ## 测试
 ```powershell
-.\.venv\Scripts\python.exe -m pytest backend/tests -q     # 后端 37 个用例
+.\.venv\Scripts\python.exe -m pytest backend/tests -q     # 后端 42 个用例
 npm run typecheck                                          # 前端类型检查
 npm run build:renderer                                     # 前端生产构建
 python scripts/check_versions.py                           # 版本号一致性自检（发版前）
