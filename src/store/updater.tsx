@@ -76,7 +76,11 @@ export function UpdaterProvider({ children }: { children: React.ReactNode }) {
           ? keepRunningPhase(p, r.latest)
             ? p
             : { phase: "available", latest: r.latest, current: r.current, releaseDate: r.releaseDate, releaseNotes: r.releaseNotes }
-          : { phase: "latest", latest: r.latest, current: r.current },
+          // "没有更新"同样不能打掉 ready / downloading：镜像缓存返回过期版本或 Release 被
+          // 回滚时，本地已下载好的安装包还在，方块不该消失。
+          : keepRunningPhase(p, p.latest)
+            ? p
+            : { phase: "latest", latest: r.latest, current: r.current },
       );
     } catch (e) {
       // 同上：invoke 本身抛错（主进程异常）也不能把 ready 打掉

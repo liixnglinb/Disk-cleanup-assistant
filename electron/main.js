@@ -131,7 +131,7 @@ function scheduleStartupCheck() {
       if (Notification.isSupported()) {
         new Notification({
           title: "磁盘清理助手有新版本",
-          body: `v${latest} 已发布，可在「设置 → 关于 → 软件更新」中一键更新。`,
+          body: `v${latest} 已发布，正在后台下载；下载完成后点击标题栏的更新方块即可安装并重启。`,
         }).show();
       }
     } catch {

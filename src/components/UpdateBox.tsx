@@ -2,9 +2,11 @@ import React, { useState } from "react";
 import Icon from "./icons";
 import ConfirmDialog from "./ConfirmDialog";
 import { useUpdater } from "../store/updater";
+import { useToast } from "../store/ToastContext";
 
 export default function UpdateBox() {
   const { state, install } = useUpdater();
+  const toast = useToast();
   const [hover, setHover] = useState(false);
   const [asking, setAsking] = useState(false);
 
@@ -52,7 +54,16 @@ export default function UpdateBox() {
         body={`将安装 v${state.latest} 并立即重启软件。当前未保存的操作会丢失。`}
         confirmText="更新并重启"
         onCancel={() => setAsking(false)}
-        onConfirm={async () => { setAsking(false); await install(); }}
+        onConfirm={async () => {
+          setAsking(false);
+          try {
+            await install();
+          } catch (e) {
+            // 安装失败时方块本身不会变状态（error 相位下它直接不渲染），
+            // toast 是用户唯一能看到的反馈。
+            toast.push({ kind: "error", message: "安装失败：" + String(e instanceof Error ? e.message : e) });
+          }
+        }}
       />
     </div>
   );
