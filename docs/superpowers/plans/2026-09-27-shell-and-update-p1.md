@@ -1569,7 +1569,7 @@ Run:
 .venv/Scripts/python.exe -m pytest backend/tests -q
 npm run check:versions
 ```
-Expected: `41 passed`（37 + 新增 4）；版本号 8 处一致退出 0
+Expected: `41 passed`（37 + 新增 4）；版本号 **7 处**一致退出 0（Task 5 已把 SettingsPanel 落点移除，见 Global Constraints）；**另注**：本任务 Step 6 原先写的"杀掉 Electron 主进程→后端消失"**不能作为验收证据**——实测在 Node/libuv 下父进程被强杀时子进程本来就会被连带收掉（<1s），该实验无论看门狗是否生效都会通过。必须改用**兄弟进程隔离法**：起一个哑进程 A，用 `--parent-pid=<A的PID>` 起后端，只杀 A，观察后端是否在 ~10s 内自退；并跑一组不传 `--parent-pid` 的对照，证明差异来自看门狗。
 
 真机验证（**必做，这是本 bug 的唯一结论性证据**）：
 1. `npm run dev` 起完整应用（Electron 会拉起带 `--parent-pid` 的后端）
