@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { api } from "../api/client";
 import { useToast } from "../store/ToastContext";
-import { loadSettings } from "./SettingsPanel";
+import { useSettings } from "../store/settings";
 import type { DeleteResult } from "../types";
 import { baseName, formatBytes } from "../utils/format";
 import Icon from "./icons";
@@ -44,6 +44,9 @@ export default function ConfirmDialog({
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<DeleteResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 必须在任何条件 return 之前调用：下面有"通用确认"与"删除确认"两条分支，
+  // 把 hook 放到 return 之后会造成渲染间 hooks 数量不一致。
+  const settings = useSettings();
 
   if (!open) return null;
 
@@ -64,7 +67,6 @@ export default function ConfirmDialog({
     );
   }
 
-  const settings = loadSettings();
   const permanentAllowed = settings.allowPermanentDelete;
   const canConfirm = !(permanent && !permanentAck) && paths.length > 0 && !busy;
 

@@ -5,7 +5,7 @@ import type { CacheCandidate, CacheOverview } from "../types";
 import { formatBytes } from "../utils/format";
 import { useToast } from "../store/ToastContext";
 import { KB_RECOMMENDATION_META, kbRiskLabel } from "../utils/format";
-import { loadSettings } from "./SettingsPanel";
+import { loadSettings } from "../store/settings";
 import ConfirmModal from "./ConfirmModal";
 
 type RecFilter = "all" | "recommend" | "caution";

@@ -3,6 +3,8 @@ import { api } from "../api/client";
 import Icon from "./icons";
 import type { ResidueResult, SoftwareItem } from "../types";
 import { useToast } from "../store/ToastContext";
+import { formatBytes } from "../utils/format";
+import ConfirmModal from "./ConfirmModal";
 
 function isIdle(it: SoftwareItem): boolean {
   if (it.last_used) {
@@ -41,6 +43,7 @@ export default function SoftwarePanel() {
 
   // 卸载中 / 残留扫描状态
   const [uninstalling, setUninstalling] = useState<string | null>(null);
+  const [uninstallTarget, setUninstallTarget] = useState<SoftwareItem | null>(null);
   const [residueFor, setResidueFor] = useState<string | null>(null);
   const [residueResult, setResidueResult] = useState<ResidueResult | null>(null);
   const [residueBusy, setResidueBusy] = useState(false);
@@ -96,9 +99,14 @@ export default function SoftwarePanel() {
     return [...arr].sort((a, b) => mul * ((a.installed_size_mb ?? 0) - (b.installed_size_mb ?? 0)));
   }, [items, drive, idleOnly, keyword, sortOrder]);
 
-  const doUninstall = async (it: SoftwareItem) => {
-    if (!it.uninstall_string) return;
-    if (!window.confirm(`将启动「${it.name}」的官方卸载程序。\n\n请在随后弹出的卸载向导中完成操作。`)) return;
+  const askUninstall = (it: SoftwareItem) => {
+    if (it.uninstall_string) setUninstallTarget(it);
+  };
+
+  const doUninstall = async () => {
+    const it = uninstallTarget;
+    setUninstallTarget(null);
+    if (!it || !it.uninstall_string) return;
     setUninstalling(it.name);
     setError(null);
     try {
@@ -232,7 +240,7 @@ export default function SoftwarePanel() {
                   <>
                     <button
                       className="btn small danger"
-                      onClick={() => doUninstall(it)}
+                      onClick={() => askUninstall(it)}
                       disabled={uninstalling === it.name}
                     >
                       {uninstalling === it.name ? "启动中…" : "卸载"}
@@ -273,20 +281,17 @@ export default function SoftwarePanel() {
         })}
         {shown.length === 0 && <div className="empty">未找到匹配的软件</div>}
       </div>
+
+      <ConfirmModal
+        open={uninstallTarget !== null}
+        title={`启动「${uninstallTarget?.name ?? ""}」的官方卸载程序？`}
+        desc="将调用该程序自带的卸载向导，后续步骤由它自己的界面完成。"
+        confirmText="启动卸载"
+        danger
+        busy={uninstalling !== null}
+        onClose={() => setUninstallTarget(null)}
+        onConfirm={doUninstall}
+      />
     </div>
   );
-}
-
-function formatBytes(bytes: number): string {
-  if (!bytes) return "0 B";
-  const n = Math.abs(bytes);
-  if (n < 1024) return `${bytes} B`;
-  const units = ["KB", "MB", "GB", "TB"];
-  let v = n;
-  let i = -1;
-  do {
-    v /= 1024;
-    i += 1;
-  } while (v >= 1024 && i < units.length - 1);
-  return `${v.toFixed(v >= 100 ? 0 : v >= 10 ? 1 : 2)} ${units[i]}`;
 }

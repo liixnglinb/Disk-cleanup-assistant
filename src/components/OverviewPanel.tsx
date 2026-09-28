@@ -4,7 +4,7 @@ import { useScan } from "../store/ScanContext";
 import Icon from "./icons";
 import type { DriveInfo, FileRecord } from "../types";
 import { CATEGORY_META, formatBytes, RECOMMENDATION_META, baseName } from "../utils/format";
-import { loadSettings } from "./SettingsPanel";
+import { useSettings } from "../store/settings";
 
 interface Props {
   onOpenFiles: (filter?: { category?: string; recommendation?: string; keyword?: string }) => void;
@@ -12,6 +12,7 @@ interface Props {
 
 export default function OverviewPanel({ onOpenFiles }: Props) {
   const { scanId, statistics, startScan, status } = useScan();
+  const settings = useSettings();
   const [drives, setDrives] = useState<DriveInfo[]>([]);
   const [selectedDrive, setSelectedDrive] = useState("");
   const [recs, setRecs] = useState<FileRecord[]>([]);
@@ -134,7 +135,7 @@ export default function OverviewPanel({ onOpenFiles }: Props) {
               <div className="hero-meta">
                 <div><b className="num">{statistics.total_files.toLocaleString()}</b><span>已扫描文件</span></div>
                 <div><b className="num">{formatBytes(totalBytes)}</b><span>占用空间</span></div>
-                <div><b className="num">{largeCount.toLocaleString()}</b><span>大文件 &gt;{loadSettings().largeFileMb}MB · {formatBytes(largeBytes)}</span></div>
+                <div><b className="num">{largeCount.toLocaleString()}</b><span>大文件 &gt;{settings.largeFileMb}MB · {formatBytes(largeBytes)}</span></div>
                 <div><b className="num">{residueCount.toLocaleString()}</b><span>残留/临时 · {formatBytes(residueBytes)}</span></div>
               </div>
             </div>

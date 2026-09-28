@@ -3,42 +3,7 @@ import { api } from "../api/client";
 import { useTheme } from "../hooks/useTheme";
 import type { AiConfig, AiPreset, AiTestResult } from "../types";
 import { useUpdater } from "../store/updater";
-
-export interface AppSettings {
-  allowPermanentDelete: boolean;
-  autoPreview: boolean;
-  largeFileMb: number;
-  restorePointOnDelete: boolean;
-  showSafeCleanHint: boolean;
-}
-
-const KEY = "ltb-settings";
-
-const DEFAULTS: AppSettings = {
-  allowPermanentDelete: false,
-  autoPreview: true,
-  largeFileMb: 100,
-  restorePointOnDelete: false,
-  showSafeCleanHint: true,
-};
-
-export function loadSettings(): AppSettings {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      const { darkMode, ...rest } = parsed;
-      return { ...DEFAULTS, ...rest };
-    }
-  } catch {
-    /* ignore */
-  }
-  return { ...DEFAULTS };
-}
-
-export function saveSettings(s: AppSettings) {
-  localStorage.setItem(KEY, JSON.stringify(s));
-}
+import { patchSettings, useSettings } from "../store/settings";
 
 type SectionKey = "general" | "scan" | "ai" | "safety" | "about";
 
@@ -73,7 +38,7 @@ function Toggle({ on, onChange, label, desc, warn }: {
 export default function SettingsPanel() {
   const { theme, toggleTheme } = useTheme();
   const { state: update, check: checkUpdate } = useUpdater();
-  const [settings, setSettings] = useState<AppSettings>(loadSettings);
+  const settings = useSettings();
   const GROUPS = new Set<SectionKey>(["general", "scan", "ai", "safety", "about"]);
 
   // ---- AI 配置 ----
@@ -135,13 +100,7 @@ export default function SettingsPanel() {
     }
   };
 
-  const set = (patch: Partial<AppSettings>) => {
-    setSettings((prev) => {
-      const next = { ...prev, ...patch };
-      saveSettings(next);
-      return next;
-    });
-  };
+  const set = patchSettings;
 
   // 更新状态与订阅统一由 UpdaterProvider 持有（标题栏方块与设置页共用同一状态源）
 

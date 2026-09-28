@@ -5,13 +5,17 @@ import { useScan } from "../store/ScanContext";
 import type { DuplicateGroup } from "../types";
 import { baseName, formatBytes, formatTime } from "../utils/format";
 import { useToast } from "../store/ToastContext";
+import ConfirmModal from "./ConfirmModal";
+import { useSettings } from "../store/settings";
 
 export default function DuplicatesPanel() {
   const { scanId } = useScan();
+  const settings = useSettings();
   const [groups, setGroups] = useState<DuplicateGroup[]>([]);
   const [keepByGroup, setKeepByGroup] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<string[] | null>(null);
   const toast = useToast();
 
   const load = useCallback(async () => {
@@ -42,11 +46,17 @@ export default function DuplicatesPanel() {
       for (const f of g.files) if (f.path !== keep) toDelete.push(f.path);
     }
     if (toDelete.length === 0) return;
-    if (!window.confirm(`将 ${toDelete.length} 个重复文件移入回收站？（每个重复组保留你选择的一份）`)) return;
+    setPending(toDelete);
+  };
+
+  const runClean = async () => {
+    const toDelete = pending || [];
+    setPending(null);
+    if (toDelete.length === 0) return;
     setBusy(true);
     setError(null);
     try {
-      const res = await api.deleteFiles(toDelete, false);
+      const res = await api.deleteFiles(toDelete, false, settings.restorePointOnDelete);
       toast.push({ kind: "ok", message: `已清理 ${res.ok.length} 个重复副本，释放 ${formatBytes(res.freed_bytes)}` });
       await load();
     } catch (e) {
@@ -85,6 +95,16 @@ export default function DuplicatesPanel() {
         </div>
       ))}
       {groups.length === 0 && scanId && <div className="empty">未发现重复文件</div>}
+
+      <ConfirmModal
+        open={pending !== null}
+        title={`将 ${pending?.length ?? 0} 个重复副本移入回收站？`}
+        desc="每个重复组保留你选择的那一份，其余移入回收站（可恢复）。"
+        confirmText="移入回收站"
+        busy={busy}
+        onClose={() => setPending(null)}
+        onConfirm={runClean}
+      />
     </div>
   );
 }

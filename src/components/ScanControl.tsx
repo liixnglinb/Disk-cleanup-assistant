@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "../api/client";
 import Icon from "./icons";
 import { useScan } from "../store/ScanContext";
-import { loadSettings } from "./SettingsPanel";
+import { loadSettings } from "../store/settings";
 import type { DriveInfo } from "../types";
 import { formatBytes } from "../utils/format";
 

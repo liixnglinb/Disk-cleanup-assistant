@@ -6,7 +6,7 @@ import type { AiFileResult, FileRecord } from "../types";
 import { baseName, CATEGORY_META, dirName, formatBytes, formatTime, RECOMMENDATION_META, RISK_META } from "../utils/format";
 import ConfirmDialog from "./ConfirmDialog";
 import { useToast } from "../store/ToastContext";
-import { loadSettings } from "./SettingsPanel";
+import { useSettings } from "../store/settings";
 
 const ROW = 24;
 const PAGE = 500;
@@ -58,7 +58,7 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
   const listRef = useRef<HTMLDivElement | null>(null);
   const toast = useToast();
   // 设置：大文件阈值 / 自动预览 / 已 AI 分析标记（会话内避免重复标“存疑”）
-  const settings = React.useMemo(() => loadSettings(), []);
+  const settings = useSettings();
   const largeBytes = settings.largeFileMb * 1024 * 1024;
   const aiHandled = useRef<Set<string>>(new Set());
 
