@@ -28,9 +28,8 @@ TEXT_TARGETS = [
     ("backend/platform.py", r'version:\s*str\s*=\s*"([^"]+)"'),
     ("backend/tools/disk_cleanup.py", r'__version__\s*=\s*"([^"]+)"'),
     ("backend/tools/_template_tool.py", r'__version__\s*=\s*"([^"]+)"'),
-    # 前端只保留这一处：Shell 的版本号已改为 vite define 注入（__APP_VERSION__，源即
-    # package.json），registry.tsx 已随多工具平台机制移除——两者都不再是独立落点。
-    ("src/components/SettingsPanel.tsx", r'"(\d+\.\d+\.\d+)"'),
+    # 前端已无独立版本落点：Shell 与 SettingsPanel 的版本号都由 vite define 注入
+    # （__APP_VERSION__，源即 package.json），registry.tsx 随多工具平台机制移除。
 ]
 
 

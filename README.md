@@ -151,7 +151,7 @@ pytest → 前端 typecheck/构建 → PyInstaller 后端 → electron-builder N
 打包步骤显式带 `--publish never`，避免 electron-builder 在 tag 构建时误用
 `package.json` 里指向 `example.com` 的 publish 占位配置。
 
-构建前执行 `python scripts/check_versions.py` 校验 10 处版本号是否一致；tag 构建还会
+构建前执行 `python scripts/check_versions.py` 校验 7 处版本号是否一致；tag 构建还会
 校验 tag 与代码版本是否匹配，不一致直接中断。本地发版前可用 `npm run check:versions` 自查。
 
 ## 自动更新（electron-updater）

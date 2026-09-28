@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { useTheme } from "../hooks/useTheme";
 import type { AiConfig, AiPreset, AiTestResult } from "../types";
+import { useUpdater } from "../store/updater";
 
 export interface AppSettings {
   allowPermanentDelete: boolean;
@@ -80,6 +81,7 @@ function Toggle({ on, onChange, label, desc, warn }: {
 
 export default function SettingsPanel() {
   const { theme, toggleTheme } = useTheme();
+  const { state: update, check: checkUpdate, install: installUpdate } = useUpdater();
   const [settings, setSettings] = useState<AppSettings>(loadSettings);
   const [section, setSection] = useState<SectionKey>("general");
 
@@ -150,97 +152,7 @@ export default function SettingsPanel() {
     });
   };
 
-  // ---- 自动更新（electron-updater） ----
-  type UpdateState =
-    | { status: "idle" }
-    | { status: "checking" }
-    | { status: "latest"; info: UpdateCheckResult }
-    | { status: "has"; info: UpdateCheckResult }
-    | { status: "downloading"; info: UpdateCheckResult; progress: UpdateProgress }
-    | { status: "downloaded"; info: UpdateCheckResult }
-    | { status: "error"; err: string };
-  const [update, setUpdate] = useState<UpdateState>({ status: "idle" });
-  const [dlErr, setDlErr] = useState<string | null>(null);
-
-  // 主进程推送的下载进度 / 下载完成 / 出错事件
-  useEffect(() => {
-    if (!window.dca) return;
-    const offProgress = window.dca.onUpdateProgress((p) => {
-      setUpdate((prev) => (prev.status === "downloading" ? { ...prev, progress: p } : prev));
-    });
-    const offDownloaded = window.dca.onUpdateDownloaded(() => {
-      setUpdate((prev) =>
-        prev.status === "downloading" ? { status: "downloaded", info: prev.info } : prev,
-      );
-    });
-    const offError = window.dca.onUpdateError((e) => {
-      setDlErr(e.message);
-      setUpdate((prev) => (prev.status === "downloading" ? { status: "has", info: prev.info } : prev));
-    });
-    // 主进程在启动后会静默检查一次；发现新版本时把界面直接切到「可更新」状态
-    const offAvailable = window.dca.onUpdateAvailable((i) => {
-      setUpdate((prev) =>
-        prev.status === "idle"
-          ? {
-              status: "has",
-              info: {
-                ok: true,
-                latest: i.latest,
-                current: i.current,
-                hasUpdate: true,
-                releaseDate: i.releaseDate,
-              },
-            }
-          : prev,
-      );
-    });
-    return () => {
-      offProgress();
-      offDownloaded();
-      offError();
-      offAvailable();
-    };
-  }, []);
-
-  const checkUpdate = async () => {
-    if (!window.dca) {
-      setUpdate({ status: "error", err: "当前环境不支持自动更新（仅桌面版可用）。" });
-      return;
-    }
-    setUpdate({ status: "checking" });
-    setDlErr(null);
-    try {
-      const r = await window.dca.checkUpdate();
-      if (!r.ok) {
-        setUpdate({ status: "error", err: r.error || "检查更新失败" });
-        return;
-      }
-      setUpdate(r.hasUpdate ? { status: "has", info: r } : { status: "latest", info: r });
-    } catch (e) {
-      setUpdate({ status: "error", err: String(e instanceof Error ? e.message : e) });
-    }
-  };
-
-  const startDownload = async () => {
-    if (update.status !== "has" || !window.dca) return;
-    const info = update.info;
-    setDlErr(null);
-    setUpdate({
-      status: "downloading",
-      info,
-      progress: { percent: 0, transferred: 0, total: 0, bytesPerSecond: 0 },
-    });
-    const r = await window.dca.downloadUpdate();
-    if (!r.ok) {
-      setDlErr(r.error || "下载更新失败");
-      setUpdate({ status: "has", info });
-    }
-  };
-
-  const installUpdate = async () => {
-    if (!window.dca) return;
-    await window.dca.installUpdate();
-  };
+  // 更新状态与订阅统一由 UpdaterProvider 持有（标题栏方块与设置页共用同一状态源）
 
   return (
     <div className="tool settings">
@@ -384,62 +296,34 @@ export default function SettingsPanel() {
             <>
               <SectionTitle title="关于" />
               <div style={{ padding: "6px 0" }}>
-                <div className="setting-label">磁盘清理助手 v{update.status !== "idle" && update.status !== "checking" && update.status !== "error" ? update.info.current : "0.3.0"}</div>
+                <div className="setting-label">磁盘清理助手 v{__APP_VERSION__}</div>
                 <div className="setting-desc" style={{ marginTop: 8, lineHeight: 1.7 }}>
                   深度文件分析 + AI 辅助 + 安全回收站删除，所有数据留在本机。
                   <br />架构：Electron + React + TypeScript + Python FastAPI（本地 127.0.0.1 通信、自动端口）。
                 </div>
               </div>
 
-              {/* 软件更新（electron-updater） */}
+              {/* 软件更新（electron-updater）：状态源与标题栏更新方块一致 */}
               <div className="setting-row" style={{ borderTop: "1px solid var(--border)", marginTop: 18, paddingTop: 16 }}>
                 <div className="setting-row-main">
                   <div className="setting-label">软件更新</div>
                   <div className="setting-desc" style={{ lineHeight: 1.6 }}>
-                    {update.status === "idle" && "发现新版本后可在软件内直接下载，重启即完成更新，无需再下载安装包。"}
-                    {update.status === "checking" && "正在检查最新版本…"}
-                    {update.status === "latest" && `已是最新版本 v${update.info.current}。`}
-                    {update.status === "has" && (
-                      <>发现新版本 <strong>v{update.info.latest}</strong>（当前 v{update.info.current}）
-                      {update.info.releaseDate ? ` · 发布于 ${update.info.releaseDate.slice(0, 10)}` : ""}。
-                      {update.info.releaseNotes ? <div style={{ marginTop: 6, maxHeight: 84, overflow: "auto", whiteSpace: "pre-wrap", opacity: 0.85, fontSize: 12 }}>{update.info.releaseNotes}</div> : null}
-                      </>
-                    )}
-                    {update.status === "downloading" && (
-                      <>
-                        正在下载 v{update.info.latest} … {update.progress.percent.toFixed(1)}%
-                        <div style={{ marginTop: 8, height: 6, borderRadius: 3, background: "var(--border)", overflow: "hidden" }}>
-                          <div style={{ width: `${Math.min(100, update.progress.percent)}%`, height: "100%", background: "var(--primary, #378ADD)", transition: "width .2s" }} />
-                        </div>
-                        <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8 }}>
-                          {(update.progress.transferred / 1048576).toFixed(1)} / {(update.progress.total / 1048576).toFixed(1)} MB
-                          {update.progress.bytesPerSecond > 0 ? ` · ${(update.progress.bytesPerSecond / 1048576).toFixed(1)} MB/s` : ""}
-                        </div>
-                      </>
-                    )}
-                    {update.status === "downloaded" && `v${update.info.latest} 已下载完成，重启后即可使用新版本。`}
-                    {update.status === "error" && <span style={{ color: "var(--danger, #e5484d)" }}>{update.err}</span>}
+                    {update.phase === "idle" && "发现新版本后会自动下载，点击标题栏的更新方块即可重启安装。"}
+                    {update.phase === "checking" && "正在检查最新版本…"}
+                    {update.phase === "latest" && `已是最新版本 v${update.current}。`}
+                    {update.phase === "available" && `发现新版本 v${update.latest}，正在准备下载…`}
+                    {update.phase === "downloading" && `正在下载 v${update.latest} … ${(update.percent ?? 0).toFixed(1)}%`}
+                    {update.phase === "ready" && `v${update.latest} 已下载完成，点击标题栏的更新方块完成安装。`}
+                    {update.phase === "error" && <span style={{ color: "var(--danger, #e5484d)" }}>{update.error}</span>}
                   </div>
-
-                  {update.status === "has" && (
-                    <div style={{ marginTop: 12 }}>
-                      <button className="btn primary" onClick={startDownload}>下载更新</button>
-                    </div>
-                  )}
-                  {update.status === "downloaded" && (
-                    <div style={{ marginTop: 12 }}>
-                      <button className="btn primary" onClick={installUpdate}>重启并安装</button>
-                    </div>
-                  )}
-                  {dlErr && <div className="notice error" style={{ marginTop: 10 }}>{dlErr}</div>}
                 </div>
                 <div className="setting-control">
                   <button
                     className="btn"
                     onClick={checkUpdate}
-                    disabled={update.status === "checking" || update.status === "downloading"}
+                    disabled={update.phase === "checking" || update.phase === "downloading"}
                   >
-                    {update.status === "checking" ? "检查中…" : "检查更新"}
+                    {update.phase === "checking" ? "检查中…" : "检查更新"}
                   </button>
                 </div>
               </div>

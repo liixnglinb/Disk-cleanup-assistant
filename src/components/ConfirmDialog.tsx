@@ -6,16 +6,38 @@ import type { DeleteResult } from "../types";
 import { baseName, formatBytes } from "../utils/format";
 import Icon from "./icons";
 
-interface Props {
-  open: boolean;
-  paths: string[];
-  onClose: () => void;
-  onDone: () => Promise<void>;
+/**
+ * 通用确认模式（可选）：传入 title 即走通用文案，不涉及删除流程，
+ * 删除专用 props（paths/onClose/onDone）与永久删除选项都不参与渲染。
+ */
+export interface GenericConfirmProps {
+  open?: boolean;
+  title?: string;
+  body?: string;
+  confirmText?: string;
+  onConfirm?: () => void;
+  onCancel?: () => void;
+}
+
+interface Props extends GenericConfirmProps {
+  paths?: string[];
+  onClose?: () => void;
+  onDone?: () => Promise<void>;
 }
 
 const SHOW_MAX = 5;
 
-export default function ConfirmDialog({ open, paths, onClose, onDone }: Props) {
+export default function ConfirmDialog({
+  open,
+  paths = [],
+  onClose,
+  onDone,
+  title,
+  body,
+  confirmText,
+  onConfirm,
+  onCancel,
+}: Props) {
   const toast = useToast();
   const [permanent, setPermanent] = useState(false);
   const [permanentAck, setPermanentAck] = useState(false);
@@ -24,6 +46,23 @@ export default function ConfirmDialog({ open, paths, onClose, onDone }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   if (!open) return null;
+
+  // 通用确认模式：只有 title/body/onConfirm，不渲染文件清单、永久删除与还原点提示
+  if (title) {
+    return (
+      <div className="modal-mask" onClick={() => onCancel?.()}>
+        <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-icon"><Icon name="refresh" size={22} /></div>
+          <h3>{title}</h3>
+          {body && <p className="modal-desc">{body}</p>}
+          <div className="modal-actions">
+            <button className="btn" onClick={() => onCancel?.()}>取消</button>
+            <button className="btn primary" onClick={() => onConfirm?.()}>{confirmText ?? "确定"}</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const settings = loadSettings();
   const permanentAllowed = settings.allowPermanentDelete;
@@ -34,7 +73,7 @@ export default function ConfirmDialog({ open, paths, onClose, onDone }: Props) {
     setError(null);
     setPermanentAck(false);
     setPermanent(false);
-    onClose();
+    onClose?.();
   };
 
   // 清理报告视图（删除完成后展示）
@@ -85,7 +124,7 @@ export default function ConfirmDialog({ open, paths, onClose, onDone }: Props) {
       const res = await api.deleteFiles(paths, permanent, settings.restorePointOnDelete);
       setResult(res);
       toast.push({ kind: "ok", message: `已删除 ${res.ok.length} 个文件，释放 ${formatBytes(res.freed_bytes)}` });
-      await onDone();
+      await onDone?.();
     } catch (e) {
       setError(String(e instanceof Error ? e.message : e));
     } finally {

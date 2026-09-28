@@ -26,8 +26,10 @@ function send(channel, payload) {
 const PRIMARY_FEED =
   "https://gh-proxy.com/https://github.com/liixnglinb/Disk-cleanup-assistant/releases/latest/download";
 
-autoUpdater.autoDownload = false; // 由用户在界面确认后再下载
-autoUpdater.autoInstallOnAppQuit = true; // 用户未点「重启并安装」时，退出应用也会完成安装
+if (!app.isPackaged) autoUpdater.forceDevUpdateConfig = true; // 开发模式读仓库根的 dev-app-update.yml（已 gitignore）
+// 保持 false，由 update-available 处理器显式下载：这样测速可插在检查与下载之间
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = false; // 必须由用户点「更新并重启」确认，退出时不静默安装
 autoUpdater.allowDowngrade = false;
 
 autoUpdater.on("download-progress", (p) => {
@@ -40,7 +42,25 @@ autoUpdater.on("download-progress", (p) => {
 });
 
 autoUpdater.on("update-downloaded", (info) => {
+  downloadedVersion = downloadingVersion;
+  downloadingVersion = null;
   send("update:downloaded", { version: (info && info.version) || "" });
+});
+
+// 去重闸门：同一版本只自动下载一次（渲染层与主进程各会触发一次 update-available）
+let downloadingVersion = null;
+let downloadedVersion = null;
+
+autoUpdater.on("update-available", async (info) => {
+  const v = String((info && info.version) || "");
+  if (!v || v === downloadingVersion || v === downloadedVersion) return;
+  downloadingVersion = v;
+  try {
+    await autoUpdater.downloadUpdate();
+  } catch (err) {
+    downloadingVersion = null;
+    send("update:error", { message: String((err && err.message) || err) });
+  }
 });
 
 autoUpdater.on("error", (err) => {
@@ -97,10 +117,12 @@ function scheduleStartupCheck() {
       const latest = String(info.version || "").replace(/^v/, "");
       if (!versionGt(latest, app.getVersion())) return;
 
+      const notes = typeof info.releaseNotes === "string" ? info.releaseNotes : "";
       const payload = {
         latest,
         current: app.getVersion(),
         releaseDate: info.releaseDate || "",
+        releaseNotes: notes.slice(0, 2000),
       };
       send("update:available", payload);
 
@@ -132,7 +154,7 @@ ipcMain.handle("update:check", async () => {
     latest,
     hasUpdate: versionGt(latest, current),
     releaseDate: info.releaseDate || "",
-    releaseNotes: notes.slice(0, 800),
+    releaseNotes: notes.slice(0, 2000),
   };
 });
 
