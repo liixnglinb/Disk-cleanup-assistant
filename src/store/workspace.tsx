@@ -1,30 +1,67 @@
-import React, { createContext, useContext, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
 import type { IconName } from "../components/icons";
+import type { FileFilter } from "../components/FileTable";
 
-export type SectionKey =
-  | "overview" | "files" | "cache" | "kb" | "software" | "duplicates" | "logs" | "settings";
+export type SectionKey = "overview" | "clean" | "software" | "settings";
+export type DrawerKey = "logs" | "kb" | null;
+export type CleanSegmentKey = "cache" | "files" | "duplicates";
 
 interface WorkspaceCtx {
   section: SectionKey;
   setSection: (s: SectionKey) => void;
+  drawer: DrawerKey;
+  openDrawer: (d: Exclude<DrawerKey, null>) => void;
+  closeDrawer: () => void;
+  cleanSeg: CleanSegmentKey;
+  fileFilter: FileFilter;
+  /** 跳到「清理」工作区的某个来源，可带文件筛选条件 */
+  openClean: (seg: CleanSegmentKey, filter?: FileFilter) => void;
+  setFileFilter: (f: FileFilter) => void;
 }
 
 const Ctx = createContext<WorkspaceCtx | null>(null);
 
 export const SECTIONS: { key: SectionKey; label: string; icon: IconName }[] = [
   { key: "overview", label: "概览", icon: "chart" },
-  { key: "files", label: "文件清理", icon: "file" },
-  { key: "cache", label: "缓存清理", icon: "eraser" },
-  { key: "kb", label: "目录百科", icon: "book" },
-  { key: "software", label: "软件管理", icon: "package" },
-  { key: "duplicates", label: "重复文件", icon: "copy" },
-  { key: "logs", label: "删除日志", icon: "log" },
+  { key: "clean", label: "清理", icon: "eraser" },
+  { key: "software", label: "软件", icon: "package" },
   { key: "settings", label: "设置", icon: "settings" },
+];
+
+/** 「清理」工作区里的三个来源分段 */
+export const CLEAN_SEGMENTS: { key: CleanSegmentKey; label: string; icon: IconName }[] = [
+  { key: "cache", label: "缓存", icon: "eraser" },
+  { key: "files", label: "文件", icon: "file" },
+  { key: "duplicates", label: "重复", icon: "copy" },
 ];
 
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [section, setSection] = useState<SectionKey>("overview");
-  const value = useMemo(() => ({ section, setSection }), [section]);
+  const [drawer, setDrawer] = useState<DrawerKey>(null);
+  const [cleanSeg, setCleanSeg] = useState<CleanSegmentKey>("cache");
+  const [fileFilter, setFileFilter] = useState<FileFilter>({});
+
+  const openClean = useCallback((seg: CleanSegmentKey, filter?: FileFilter) => {
+    setCleanSeg(seg);
+    if (filter) setFileFilter(filter);
+    setSection("clean");
+  }, []);
+
+  const value = useMemo(
+    () => ({
+      section,
+      setSection,
+      drawer,
+      openDrawer: (d: Exclude<DrawerKey, null>) => setDrawer((cur) => (cur === d ? null : d)),
+      closeDrawer: () => setDrawer(null),
+      cleanSeg,
+      fileFilter,
+      openClean,
+      setFileFilter,
+    }),
+    [section, drawer, cleanSeg, fileFilter, openClean],
+  );
+
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

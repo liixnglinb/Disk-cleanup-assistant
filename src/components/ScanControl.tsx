@@ -39,7 +39,6 @@ export default function ScanControl() {
   return (
     <div className="titlebar-scan no-drag">
       <select
-        className="drive-select"
         value={selectedDrive}
         onChange={(e) => setSelectedDrive(e.target.value)}
         disabled={running || paused || starting}

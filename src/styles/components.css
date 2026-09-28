@@ -201,26 +201,6 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
 .drive-card .drive-bar { height: 6px; border-radius: 999px; background: var(--surface-hover); overflow: hidden; }
 .drive-card .drive-bar i { display: block; height: 100%; border-radius: 999px; background: var(--primary); }
 
-.tool-card:hover:not(.disabled) { border-color: var(--border-strong); box-shadow: var(--shadow); }
-.tool-card.disabled { opacity: 0.5; cursor: not-allowed; }
-
-.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
-.stat-card {
-  position: relative; display: flex; flex-direction: column; gap: 5px;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
-  padding: 16px 18px; box-shadow: var(--shadow-sm); overflow: hidden;
-  transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
-}
-.stat-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow); }
-.stat-card .stat-icon { color: var(--text-dim); margin-bottom: 2px; }
-.stat-card .stat-num { font-size: var(--fs-2xl); font-weight: var(--fw-semibold); color: var(--text); }
-.stat-card .stat-label { color: var(--text-muted); font-size: var(--fs-base); }
-.stat-card .stat-sub { font-size: var(--fs-xs); color: var(--text-dim); }
-.stat-card.tone-ok .stat-num { color: var(--ok); }
-.stat-card.tone-warn .stat-num { color: var(--warn); }
-.stat-card.tone-danger .stat-num { color: var(--danger); }
-.stat-card.tone-primary .stat-num { color: var(--primary); }
-
 .cat-list { display: flex; flex-direction: column; gap: 6px; }
 .cat-row {
   display: flex; align-items: center; gap: 14px;
@@ -605,15 +585,6 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
 /* ===== 设置 AI 配置 ===== */
 .setting-control input[type="text"] { min-width: 0; }
 
-/* ===== 统计 ===== */
-.stats { display: flex; flex-direction: column; gap: 14px; }
-.stat-card.hero { align-items: center; text-align: center; }
-.stat-card .stat-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.stat-card .stat-name { font-weight: var(--fw-semibold); color: var(--text-body); font-size: var(--fs-base); }
-.stat-card .stat-meta { color: var(--text-muted); font-size: var(--fs-xs); font-family: var(--font-mono); }
-.stat-card .dot { width: 9px; height: 9px; border-radius: 999px; display: inline-block; margin-right: 8px; }
-.stat-card .bar { height: 5px; border-radius: 999px; background: var(--surface-hover); overflow: hidden; margin-top: 8px; }
-.stat-card .bar-fill { height: 100%; border-radius: 999px; }
 .cd-row { display: flex; align-items: center; gap: 10px; }
 .file-section { display: flex; flex-direction: column; gap: 10px; }
 
@@ -681,13 +652,9 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
    ===========================================================================*/
 [data-theme="dark"] .btn.primary,
 [data-theme="dark"] .btn.primary:hover:not(:disabled),
-[data-theme="dark"] .home-hero-cta,
-[data-theme="dark"] .home-hero-cta:hover,
 [data-theme="dark"] .sw-drive-tab.active {
   color: #14151A;
 }
-[data-theme="dark"] .home-logo,
-[data-theme="dark"] .tool-card-icon,
 [data-theme="dark"] .sw-icon {
   color: #14151A;
 }
@@ -758,3 +725,31 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
   .hero { flex-direction: column; align-items: stretch; }
   .hero-meta { grid-template-columns: repeat(4, minmax(90px, auto)); }
 }
+
+/* ===== 清理工作区的来源分段 ===== */
+.seg-row { display: flex; gap: 4px; padding: 3px; margin-bottom: 14px; width: max-content;
+  background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius); }
+.seg-item {
+  display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 12px;
+  border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-muted);
+  font-family: var(--font-ui); font-size: var(--fs-table); font-weight: var(--fw-medium); cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.seg-item:hover { color: var(--text); }
+.seg-item.active { background: var(--surface); color: var(--text); font-weight: var(--fw-semibold); box-shadow: var(--shadow-sm); }
+
+/* ===== 右侧抽屉（删除日志 / 目录百科） ===== */
+.drawer-mask { position: fixed; inset: 0; z-index: 90; background: var(--mask); display: flex; justify-content: flex-end; }
+.drawer {
+  width: 420px; max-width: 92vw; height: 100%; display: flex; flex-direction: column;
+  background: var(--bg-elevated); border-left: 1px solid var(--border); box-shadow: var(--shadow-lg);
+  animation: drawerIn var(--dur-med) var(--ease-out) both;
+}
+@keyframes drawerIn { from { transform: translateX(24px); opacity: 0.4; } to { transform: none; opacity: 1; } }
+.drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 0 14px 0 16px; height: var(--titlebar-h); flex: none; border-bottom: 1px solid var(--border); }
+.drawer-title { display: inline-flex; align-items: center; gap: 7px; font-size: var(--fs-table); font-weight: var(--fw-semibold); color: var(--text); }
+.drawer-title svg { color: var(--text-muted); }
+.drawer-body { flex: 1; min-height: 0; overflow: auto; padding: 14px; }
+.drawer-body .panel { margin-bottom: 12px; }
+.icon-btn.on { background: var(--primary-soft); color: var(--primary); }

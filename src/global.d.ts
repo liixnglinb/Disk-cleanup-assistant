@@ -28,7 +28,6 @@ interface DcaBridge {
   getApiToken: () => string | null;
   toggleMaximize: () => Promise<{ maximized: boolean }>;
   setTitleBarOverlay: (theme: "light" | "dark") => Promise<{ ok: boolean }>;
-  onMaximizedChanged: (cb: (m: { maximized: boolean }) => void) => () => void;
   checkUpdate: () => Promise<UpdateCheckResult>;
   installUpdate: () => Promise<UpdateActionResult>;
   onUpdateAvailable: (

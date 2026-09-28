@@ -211,9 +211,6 @@ if (!gotLock) {
       },
     });
 
-    mainWindow.on("maximize", () => send("win:maximized-changed", { maximized: true }));
-    mainWindow.on("unmaximize", () => send("win:maximized-changed", { maximized: false }));
-
     const devUrl = process.env.ELECTRON_START_URL;
     const query = { backend: String(port), apiToken };
     if (devUrl) {
