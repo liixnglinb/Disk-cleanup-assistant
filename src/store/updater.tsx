@@ -39,6 +39,20 @@ function keepRunningPhase(prev: UpdateState, latest?: string): boolean {
   return a !== "" && a === normVersion(latest);
 }
 
+/**
+ * 失败态是否允许整块覆盖当前状态（check() 的失败分支 + onUpdateError 共用）。
+ *
+ * ready：安装包已经下载完成，而 autoInstallOnAppQuit 为 false —— 安装只能靠用户点标题栏
+ * 方块。检查失败时若把状态整块换成 error，方块与安装入口会一起消失，本次会话再也装不上；
+ * 且主进程的去重闸门（downloadedVersion）是内存变量，重启即复位 → 已下载的安装包会被
+ * 重新下载一遍。"这次没问到"不该毁掉本地已经拿到的成果，所以 ready 下保留原状态。
+ *
+ * downloading（及其余相位）返回 true：下载失败就是要让用户看到，照旧写 error。
+ */
+export function canClobberError(prevPhase: UpdateState["phase"]): boolean {
+  return prevPhase !== "ready";
+}
+
 export function UpdaterProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<UpdateState>({ phase: "idle" });
 
@@ -53,7 +67,8 @@ export function UpdaterProvider({ children }: { children: React.ReactNode }) {
     try {
       const r = await window.dca.checkUpdate();
       if (!r.ok) {
-        setState({ phase: "error", error: r.error || "检查更新失败" });
+        // 条件写：ready 下保留原状态（见 canClobberError），其余照旧写 error
+        setState((p) => (canClobberError(p.phase) ? { phase: "error", error: r.error || "检查更新失败" } : p));
         return;
       }
       setState((p) =>
@@ -64,7 +79,9 @@ export function UpdaterProvider({ children }: { children: React.ReactNode }) {
           : { phase: "latest", latest: r.latest, current: r.current },
       );
     } catch (e) {
-      setState({ phase: "error", error: String(e instanceof Error ? e.message : e) });
+      // 同上：invoke 本身抛错（主进程异常）也不能把 ready 打掉
+      const msg = String(e instanceof Error ? e.message : e);
+      setState((p) => (canClobberError(p.phase) ? { phase: "error", error: msg } : p));
     }
   }, []);
 
@@ -81,7 +98,8 @@ export function UpdaterProvider({ children }: { children: React.ReactNode }) {
       ),
       window.dca.onUpdateProgress((p) => setState((s) => ({ ...s, phase: "downloading", percent: p.percent }))),
       window.dca.onUpdateDownloaded((i) => setState((s) => ({ ...s, phase: "ready", latest: i.version || s.latest, percent: 100 }))),
-      window.dca.onUpdateError((e) => setState((s) => ({ ...s, phase: "error", error: e.message }))),
+      // ready 下不覆盖（同 canClobberError 的理由）；downloading 等其余相位照旧写 error
+      window.dca.onUpdateError((e) => setState((s) => (canClobberError(s.phase) ? { ...s, phase: "error", error: e.message } : s))),
     ];
     // 兜底：主进程 5s 静默检查若早于本订阅，事件会丢，这里主动补一次
     const t = setTimeout(() => { void check(); }, 1500);
