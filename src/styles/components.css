@@ -77,10 +77,10 @@
 
 /* ===== 通用面板 / 卡片 ===== */
 .panel {
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  background: var(--panel-grad);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg); padding: 20px 22px; margin-bottom: 16px;
-  box-shadow: none;
+  border-radius: var(--radius-lg); padding: 18px 20px; margin-bottom: 14px;
+  box-shadow: var(--inset-hi), var(--shadow-sm);
 }
 .panel h2 { font-size: var(--fs-lg); margin-bottom: 6px; }
 .panel > .muted, .panel > p { margin-top: 0; }
@@ -115,10 +115,11 @@
 .icon-btn:hover { background: var(--surface-hover); color: var(--text); }
 
 /* ===== 表单 ===== */
-select, input[type="text"], input[type="search"], input[type="number"] {
-  height: 32px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong);
-  background: var(--input-bg); color: var(--text-body); padding: 0 10px;
-  font-family: var(--font-ui); font-size: var(--fs-base); transition: border var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out); outline: none;
+select, input[type="text"], input[type="search"], input[type="number"], input.search {
+  height: var(--field-h); border-radius: var(--radius-sm); border: 1px solid var(--border-strong);
+  background: var(--input-bg); color: var(--text-body); padding: 0 9px;
+  font-family: var(--font-ui); font-size: var(--fs-table);
+  transition: border var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out); outline: none;
 }
 select:focus, input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
 select:disabled, input:disabled { opacity: 0.55; cursor: not-allowed; }
@@ -141,11 +142,21 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
 .switch input:checked + .knob { background: var(--primary); }
 .switch input:checked + .knob::after { transform: translateX(17px); }
 
-/* ===== 徽章 ===== */
+/* ===== 徽章（只用于聚合计数；行内状态用下面的 .tag） ===== */
 .badge {
-  display: inline-flex; align-items: center; gap: 4px; height: 19px; padding: 0 8px;
+  display: inline-flex; align-items: center; gap: 4px; height: 18px; padding: 0 7px;
   border-radius: 999px; font-size: var(--fs-xs); font-weight: var(--fw-semibold); line-height: 1; white-space: nowrap;
 }
+/* 行内状态：图标着色、文字保持中性（依据 GitHub Desktop 的 octicon-status mixin 只改 fill） */
+.tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: var(--fs-table); color: var(--text-body); white-space: nowrap;
+}
+.tag svg { flex-shrink: 0; }
+.tag.ok svg { color: var(--ok); }
+.tag.warn svg { color: var(--warn); }
+.tag.danger svg { color: var(--danger); }
+.tag.muted svg { color: var(--text-dim); }
 .badge-rec  { background: var(--ok-soft); color: var(--ok); }
 .badge-caution { background: var(--warn-soft); color: var(--warn); }
 .badge-keep { background: var(--info-soft); color: var(--info); }
@@ -273,19 +284,19 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
 .file-toolbar { padding: 14px 16px 0; }
 .file-list-head, .file-row {
   display: grid;
-  grid-template-columns: 34px minmax(180px, 1.5fr) minmax(88px, 0.6fr) minmax(150px, 1.2fr) minmax(120px, 1fr) minmax(120px, 0.9fr) minmax(128px, 0.8fr) minmax(96px, 0.8fr) 44px;
+  grid-template-columns: 26px minmax(170px, 1.5fr) minmax(80px, 0.55fr) minmax(140px, 1.15fr) minmax(110px, 0.9fr) minmax(152px, 1fr) minmax(112px, 0.75fr) minmax(96px, 0.8fr) 44px;
   gap: 10px; align-items: center;
 }
 /* 关闭“文件列表自动预览”时：隐藏用途/所属软件两列，重排 6 列模板 */
 .file-list-head.no-preview, .file-row.no-preview {
-  grid-template-columns: 34px minmax(180px, 1.8fr) minmax(88px, 0.6fr) minmax(120px, 1fr) minmax(120px, 0.9fr) minmax(128px, 0.8fr) 44px;
+  grid-template-columns: 26px minmax(170px, 1.8fr) minmax(80px, 0.55fr) minmax(152px, 1fr) minmax(112px, 0.75fr) minmax(96px, 0.8fr) 44px;
 }
-.file-list-head { padding: 0 16px; height: 34px; color: var(--text-muted); font-size: var(--fs-xs); font-weight: var(--fw-semibold); border-bottom: 1px solid var(--border); background: var(--bg); }
+.file-list-head { padding: 0 16px; height: var(--head-h); color: var(--text-muted); font-size: var(--fs-xs); font-weight: var(--fw-semibold); border-bottom: 1px solid var(--border); background: var(--bg); }
 .file-list-head span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-list-body { height: 540px; overflow: auto; position: relative; }
 .file-row {
-  height: 44px; padding: 0 16px; border-bottom: 1px solid var(--border); cursor: pointer;
-  transition: background var(--dur-fast) var(--ease-out); font-size: var(--fs-base);
+  height: var(--row-h); padding: 0 16px; border-bottom: 1px solid var(--border); cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out); font-size: var(--fs-table);
 }
 .file-row:hover { background: var(--surface-hover); }
 .file-row.row-selected { background: var(--primary-soft); }
@@ -294,7 +305,7 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
 .file-row.row-large { background: color-mix(in srgb, var(--warn) 6%, var(--surface)); }
 .file-row .col-check { display: flex; align-items: center; }
 .file-row .col-name { font-weight: var(--fw-medium); color: var(--text-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.file-row .col-name .file-tags { display: inline-flex; gap: 4px; margin-left: 6px; vertical-align: middle; }
+.file-row .col-name .file-tags { display: inline-flex; gap: 8px; margin-left: 8px; vertical-align: middle; }
 .file-row .col-size { font-family: var(--font-mono); font-weight: var(--fw-semibold); color: var(--text); text-align: right; }
 .file-row.row-large .col-size { color: var(--warn); }
 .file-row .col-purpose .ai-mini {
@@ -312,14 +323,14 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
 .file-row .col-path { color: var(--text-dim); font-size: var(--fs-xs); font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .virtual-spacer { pointer-events: none; }
 .loading-row, .empty-row { text-align: center; padding: 22px; color: var(--text-muted); font-size: var(--fs-base); }
-.file-skeleton { padding: 10px 16px; display: flex; flex-direction: column; gap: 8px; }
-.file-skel-row { height: 40px; border-radius: var(--radius-sm); }
+.file-skeleton { padding: 10px 16px; display: flex; flex-direction: column; gap: 2px; }
+.file-skel-row { height: var(--row-h); border-radius: var(--radius-sm); }
 
 /* 行内快捷操作（hover 显示） */
 .col-actions { display: flex; gap: 4px; justify-content: flex-end; opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); }
 .file-row:hover .col-actions, .file-row.row-selected .col-actions { opacity: 1; }
 .row-act {
-  width: 26px; height: 26px; border: 0; border-radius: var(--radius-sm); cursor: pointer;
+  width: 22px; height: 22px; border: 0; border-radius: var(--radius-sm); cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
   background: transparent; color: var(--text-muted);
   transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
@@ -634,7 +645,8 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
 
 /* ===== 布局精修：自适应 + 浅色细节 ===== */
 /* 文件列表高度自适应：Electron 窗口小的时候自动收缩，避免底部被裁 */
-.file-list-body { height: min(540px, calc(100vh - 430px)); min-height: 280px; }
+/* 外壳从 5 条横带降到 1 条后，原来按 430px 预留的扣减会把列表白白截短一截 */
+.file-list-body { height: min(640px, calc(100vh - 330px)); min-height: 280px; }
 
 /* 文件列表选中态加左侧强调条，视觉更明确 */
 .file-row.row-selected { background: var(--primary-soft); box-shadow: inset 2px 0 0 var(--primary); }

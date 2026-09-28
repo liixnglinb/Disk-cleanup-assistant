@@ -80,7 +80,8 @@
   /* ================= 字号刻度（8 档） ================= */
   --fs-xs: 11px;    /* 元数据、路径、标签 */
   --fs-sm: 12px;    /* 辅助说明 */
-  --fs-base: 13px;  /* 正文 */
+  --fs-base: 13px;  /* 正文（中文在 12px 下偏小，正文/按钮保持 13） */
+  --fs-table: 12px; /* 密集表格与列表正文：密度靠这一档，不动 --fs-base */
   --fs-md: 14px;    /* 强调正文、卡片标题 */
   --fs-lg: 16px;    /* 分节标题、页面标题 */
   --fs-xl: 20px;    /* 主要数值 */
@@ -118,6 +119,25 @@
   --titlebar-h: 34px;
   --nav-rail-w: 48px;
   --content-pad: 24px;
+  /* 密度基线：表格行 / 表头 / 输入控件（依据 VS Code 行高 22、GitHub Desktop 文件行 29） */
+  --row-h: 24px;
+  --head-h: 28px;
+  --field-h: 26px;
+
+  /* ================= 材质（面板 = 色阶 + 顶部 1px 内高光；阴影只给浮层） ============ */
+  --panel-grad: linear-gradient(180deg, #FFFFFF 0%, var(--surface) 100%);
+  --inset-hi: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+
+  /* ================= 分类色（8 类，主题各一套；此前硬编码在 utils/format.ts，
+     暗色下 #111111 的"大文件"圆点几乎不可见） ================= */
+  --cat-system: #9A9A94;
+  --cat-download: #0550AE;
+  --cat-cache: #9A6700;
+  --cat-residue: #C1341B;
+  --cat-large: #16161A;
+  --cat-docs: #1A7F37;
+  --cat-app-data: #6B46C1;
+  --cat-unknown: #8B8B8B;
 
   /* ================= 阴影（仅用于浮层；卡片层次靠 surface + border） ================= */
   --shadow-sm: 0 1px 2px rgba(20, 20, 25, 0.04);
@@ -163,6 +183,16 @@
   --info: #8B6EFF;
   --info-soft: rgba(139, 110, 255, 0.15);
 
+  /* 暗色下分类色整体提亮，保证圆点/文字在深底上可辨 */
+  --cat-system: #8C8C86;
+  --cat-download: #6FA8E8;
+  --cat-cache: #E5B454;
+  --cat-residue: #F0736E;
+  --cat-large: #D6D8DE;
+  --cat-docs: #45C98F;
+  --cat-app-data: #A29BFF;
+  --cat-unknown: #7E828B;
+
   --purple-3: #A29BFF;
   --purple-4: #8878FF;
   --toast-info-bg: rgba(139, 110, 255, 0.16);
@@ -171,6 +201,8 @@
   --chat-bg: #14141B;
 
   /* 暗色下阴影存在感弱，仅用于浮层；卡片层次交给 surface 与 border */
+  --panel-grad: linear-gradient(180deg, #22242A 0%, var(--surface) 100%);
+  --inset-hi: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
   --shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
   --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.55);

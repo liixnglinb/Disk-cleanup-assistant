@@ -8,9 +8,26 @@ import ConfirmDialog from "./ConfirmDialog";
 import { useToast } from "../store/ToastContext";
 import { loadSettings } from "./SettingsPanel";
 
-const ROW = 44;
+const ROW = 24;
 const PAGE = 500;
 const OVERS = 8;
+
+/**
+ * 行内状态一律"图标着色 + 中性文字"，彩色胶囊只留给聚合计数。
+ * cls 沿用 utils/format.ts 的既有映射，避免改动被多个面板共用的元数据表。
+ */
+const TONE_BY_CLS: Record<string, { tone: "ok" | "warn" | "danger" | "muted"; icon: "check" | "alert" | "lock" | "info" | "shield" | "disk" }> = {
+  "badge-rec": { tone: "ok", icon: "check" },
+  "badge-caution": { tone: "warn", icon: "alert" },
+  "badge-keep": { tone: "muted", icon: "info" },
+  "badge-system": { tone: "danger", icon: "lock" },
+  "badge-large": { tone: "warn", icon: "disk" },
+  "badge-risk-low": { tone: "ok", icon: "shield" },
+  "badge-risk-medium": { tone: "warn", icon: "alert" },
+  "badge-risk-high": { tone: "danger", icon: "alert" },
+  "badge-muted": { tone: "muted", icon: "info" },
+};
+const toneOf = (cls: string) => TONE_BY_CLS[cls] || TONE_BY_CLS["badge-muted"];
 
 export interface FileFilter {
   category?: string;
@@ -245,7 +262,9 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
   }, [items.length, total, loading, page, load]);
 
   const startIdx = Math.max(0, Math.floor(scrollTop / ROW) - OVERS);
-  const endIdx = Math.min(items.length, Math.ceil((scrollTop + 560) / ROW) + OVERS);
+  // 视口高度取自真实容器，不再写死 560：容器高度会随窗口自适应（CSS 里是 min(540px, 100vh-…)）
+  const viewH = listRef.current?.clientHeight || 540;
+  const endIdx = Math.min(items.length, Math.ceil((scrollTop + viewH) / ROW) + OVERS);
   const slice = items.slice(startIdx, endIdx);
   const offsetY = startIdx * ROW;
 
@@ -325,7 +344,7 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
 
       <div className={`file-list-head ${settings.autoPreview ? "" : "no-preview"}`}>
         <span className="col-check"><input ref={headerRef} type="checkbox" checked={allVisible && someVisible} onChange={onHeaderToggle} title="全选当前筛选全部（再次点击清空）" /></span>
-        <span className="col-name">文件名 / 所属软件</span>
+        <span className="col-name">文件</span>
         <span className="col-size">大小</span>
         {settings.autoPreview && <><span className="col-purpose">用途（深度解析）</span><span className="col-owner">所属软件</span></>}
         <span className="col-rec">删除建议</span>
@@ -334,7 +353,7 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
         <span className="col-actions" />
       </div>
 
-      <div className="file-list-body" ref={listRef} onScroll={onScroll} style={{ height: 540 }}>
+      <div className="file-list-body" ref={listRef} onScroll={onScroll}>
         <div className="virtual-spacer" style={{ height: offsetY }} />
         {slice.map((rec) => {
           const locked = rec.is_locked === 1;
@@ -343,7 +362,7 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
           const needsAi = rec.needs_ai === 1 && !aiHandled.current.has(rec.path);
           const aiRes = aiResults[rec.path];
           const aiDone = Boolean(aiRes) || aiHandled.current.has(rec.path);
-          const cat = CATEGORY_META[rec.category] ?? { label: rec.category, color: "#888" };
+          const cat = CATEGORY_META[rec.category] ?? { label: rec.category, color: "var(--cat-unknown)" };
           const recMeta = RECOMMENDATION_META[rec.recommendation] ?? { label: rec.recommendation, cls: "badge-muted" };
           const riskMeta = RISK_META[rec.risk] ?? { label: rec.risk, cls: "badge-muted" };
           const rowClass = [
@@ -361,10 +380,10 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
               <span className="col-name" title={rec.path}>
                 {baseName(rec.path)}
                 <span className="file-tags">
-                  {locked && <span className="badge badge-system">系统</span>}
-                  {isLarge && <span className="badge badge-large">大</span>}
-                  {needsAi && <span className="badge badge-keep">存疑</span>}
-                  {aiDone && <span className="badge badge-rec">已解析</span>}
+                  {locked && <span className="tag danger" title="系统保护路径，不可删除"><Icon name="lock" size={12} />系统</span>}
+                  {isLarge && <span className="tag warn" title={`大于 ${settings.largeFileMb}MB`}><Icon name="disk" size={12} />大</span>}
+                  {needsAi && <span className="tag muted" title="用途未识别，待 AI 解析"><Icon name="info" size={12} />存疑</span>}
+                  {aiDone && <span className="tag ok" title="已完成深度解析"><Icon name="check" size={12} />已解析</span>}
                 </span>
               </span>
               <span className="col-size num">{formatBytes(rec.size)}</span>
@@ -390,8 +409,12 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
                 </span>
               )}
               <span className="col-rec">
-                <span className={`badge ${recMeta.cls}`} title={rec.recommendation_reason}>{recMeta.label}</span>
-                <span style={{ marginLeft: 6 }} className={`badge ${riskMeta.cls}`}>{riskMeta.label}</span>
+                <span className={`tag ${toneOf(recMeta.cls).tone}`} title={rec.recommendation_reason}>
+                  <Icon name={toneOf(recMeta.cls).icon} size={13} />{recMeta.label}
+                </span>
+                <span className={`tag ${toneOf(riskMeta.cls).tone}`} style={{ marginLeft: 10 }}>
+                  <Icon name={toneOf(riskMeta.cls).icon} size={13} />{riskMeta.label}
+                </span>
               </span>
               <span className="col-mtime">{formatTime(rec.mtime)}</span>
               <span className="col-path" title={rec.path}>{dirName(rec.path)}</span>

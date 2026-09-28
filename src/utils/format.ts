@@ -39,14 +39,14 @@ export function dirName(path: string): string {
 }
 
 export const CATEGORY_META: Record<string, { label: string; color: string }> = {
-  system: { label: "系统文件", color: "#9A9A94" },
-  download: { label: "下载目录", color: "#0550AE" },
-  cache: { label: "软件缓存", color: "#9A6700" },
-  residue: { label: "残留文件", color: "#C1341B" },
-  large: { label: "大文件", color: "#111111" },
-  docs: { label: "用户文档", color: "#1A7F37" },
-  app_data: { label: "软件数据", color: "#6B46C1" },
-  unknown: { label: "未知类型", color: "#8B8B8B" },
+  system: { label: "系统文件", color: "var(--cat-system)" },
+  download: { label: "下载目录", color: "var(--cat-download)" },
+  cache: { label: "软件缓存", color: "var(--cat-cache)" },
+  residue: { label: "残留文件", color: "var(--cat-residue)" },
+  large: { label: "大文件", color: "var(--cat-large)" },
+  docs: { label: "用户文档", color: "var(--cat-docs)" },
+  app_data: { label: "软件数据", color: "var(--cat-app-data)" },
+  unknown: { label: "未知类型", color: "var(--cat-unknown)" },
 };
 
 export const RECOMMENDATION_META: Record<string, { label: string; cls: string }> = {
@@ -64,12 +64,12 @@ export const RISK_META: Record<string, { label: string; cls: string }> = {
 
 // ===== 清理知识库（目录百科）元数据 =====
 export const KB_CATEGORY_META: Record<string, { label: string; color: string; icon: string }> = {
-  system_core: { label: "系统核心", color: "#9A9A94", icon: "" },
-  system_cache: { label: "系统缓存", color: "#0550AE", icon: "" },
-  system_temp: { label: "系统临时", color: "#6B6B66", icon: "" },
-  app_cache: { label: "软件缓存", color: "#9A6700", icon: "" },
-  app_data: { label: "软件数据", color: "#333333", icon: "" },
-  user_data: { label: "用户文件", color: "#1A7F37", icon: "" },
+  system_core: { label: "系统核心", color: "var(--cat-system)", icon: "" },
+  system_cache: { label: "系统缓存", color: "var(--cat-download)", icon: "" },
+  system_temp: { label: "系统临时", color: "var(--cat-unknown)", icon: "" },
+  app_cache: { label: "软件缓存", color: "var(--cat-cache)", icon: "" },
+  app_data: { label: "软件数据", color: "var(--cat-large)", icon: "" },
+  user_data: { label: "用户文件", color: "var(--cat-docs)", icon: "" },
 };
 
 export const KB_RECOMMENDATION_META: Record<string, { label: string; cls: string }> = {
@@ -79,13 +79,14 @@ export const KB_RECOMMENDATION_META: Record<string, { label: string; cls: string
   system: { label: "系统必留", cls: "badge-system" },
 };
 
+// 语义色四轴：可释放=ok / 谨慎=warn / 保留=info(品牌) / 锁定=danger
 export function kbRecommendationColor(rec: string): string {
   switch (rec) {
-    case "recommend": return "#1A7F37";
-    case "caution": return "#9A6700";
-    case "keep": return "#0550AE";
-    case "system": return "#C1341B";
-    default: return "#9A9A94";
+    case "recommend": return "var(--ok)";
+    case "caution": return "var(--warn)";
+    case "keep": return "var(--info)";
+    case "system": return "var(--danger)";
+    default: return "var(--text-dim)";
   }
 }
 
