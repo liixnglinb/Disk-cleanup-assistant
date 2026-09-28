@@ -1,4 +1,3 @@
-import Icon from "./icons";
 import React, { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { useTheme } from "../hooks/useTheme";
@@ -41,15 +40,7 @@ export function saveSettings(s: AppSettings) {
   localStorage.setItem(KEY, JSON.stringify(s));
 }
 
-const SECTIONS = [
-  { key: "general", label: "通用", icon: "settings" as const },
-  { key: "scan", label: "扫描设置", icon: "disk" as const },
-  { key: "ai", label: "AI 分析", icon: "info" as const },
-  { key: "safety", label: "安全设置", icon: "shield" as const },
-  { key: "about", label: "关于", icon: "file" as const },
-];
-
-type SectionKey = (typeof SECTIONS)[number]["key"];
+type SectionKey = "general" | "scan" | "ai" | "safety" | "about";
 
 function SectionTitle({ title, desc }: { title: string; desc?: string }) {
   return (
@@ -83,7 +74,7 @@ export default function SettingsPanel() {
   const { theme, toggleTheme } = useTheme();
   const { state: update, check: checkUpdate } = useUpdater();
   const [settings, setSettings] = useState<AppSettings>(loadSettings);
-  const [section, setSection] = useState<SectionKey>("general");
+  const GROUPS = new Set<SectionKey>(["general", "scan", "ai", "safety", "about"]);
 
   // ---- AI 配置 ----
   const [ai, setAi] = useState<AiConfig | null>(null);
@@ -156,19 +147,8 @@ export default function SettingsPanel() {
 
   return (
     <div className="tool settings">
-      <div className="tool-header">
-        <div className="tool-heading"><h2><span className="tool-icon"><Icon name="settings" size={22} /></span> 设置</h2></div>
-      </div>
-      <div className="settings">
-        <div className="settings-nav">
-          {SECTIONS.map((s) => (
-            <button key={s.key} className={`settings-nav-item ${section === s.key ? "active" : ""}`} onClick={() => setSection(s.key)}>
-              <Icon name={s.icon} size={15} /> {s.label}
-            </button>
-          ))}
-        </div>
-        <div className="panel settings-body">
-          {section === "general" && (
+      <div className="panel settings-body">
+          {GROUPS.has("general") && (
             <>
               <SectionTitle title="通用" desc="界面显示与交互偏好" />
               <Toggle
@@ -181,7 +161,7 @@ export default function SettingsPanel() {
               <Toggle on={settings.showSafeCleanHint} onChange={(v) => set({ showSafeCleanHint: v })} label="清理前安全提示" desc="每次执行删除前显示安全与风险提示。" />
             </>
           )}
-          {section === "scan" && (
+          {GROUPS.has("scan") && (
             <>
               <SectionTitle title="扫描设置" desc="扫描与文件分析的参数" />
               <div className="setting-row">
@@ -197,7 +177,7 @@ export default function SettingsPanel() {
               <Toggle on={settings.autoPreview} onChange={(v) => set({ autoPreview: v })} label="深度解析文件用途" desc="为每个文件分析用途、所属软件和删除建议（默认开启）。" />
             </>
           )}
-          {section === "ai" && (
+          {GROUPS.has("ai") && (
             <>
               <SectionTitle title="AI 分析" desc="文件用途分析使用的大模型服务（仅传元信息，不上传文件内容）" />
 
@@ -278,7 +258,7 @@ export default function SettingsPanel() {
               </div>
             </>
           )}
-          {section === "safety" && (
+          {GROUPS.has("safety") && (
             <>
               <SectionTitle title="安全设置" desc="删除行为与系统保护" />
               <Toggle on={settings.restorePointOnDelete} onChange={(v) => set({ restorePointOnDelete: v })} label="删除前创建系统还原点" desc="默认关闭。开启后删除前尝试创建还原点（需要管理员权限）。" warn />
@@ -292,7 +272,7 @@ export default function SettingsPanel() {
               </div>
             </>
           )}
-          {section === "about" && (
+          {GROUPS.has("about") && (
             <>
               <SectionTitle title="关于" />
               <div style={{ padding: "6px 0" }}>
@@ -329,7 +309,6 @@ export default function SettingsPanel() {
               </div>
             </>
           )}
-        </div>
       </div>
     </div>
   );
