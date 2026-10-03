@@ -126,11 +126,18 @@ export default function SettingsPanel() {
               <div className="setting-row">
                 <div className="setting-row-main">
                   <div className="setting-label">大文件阈值</div>
-                  <div className="setting-desc">超过该大小（MB）的文件在列表中高亮并归类为大文件。</div>
+                  <div className="setting-desc">超过该大小（MiB）的文件在列表中高亮并归类为大文件。</div>
                 </div>
                 <div className="setting-control">
-                  <input type="number" min={10} max={1024} value={settings.largeFileMb}
-                    onChange={(e) => set({ largeFileMb: Math.max(10, Math.min(1024, Number(e.target.value) || 100)) })} />
+                  {/* text+numeric 代替 number：Chromium 的数字输入依赖本地化资源，
+                      语言包缺失时会原生崩溃（设置页黑屏的根因），纯文本输入不依赖它 */}
+                  <input
+                    type="text" inputMode="numeric" className="large-file-mb" value={settings.largeFileMb}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, "");
+                      set({ largeFileMb: Math.max(10, Math.min(1024, Number(digits) || 100)) });
+                    }}
+                  />
                 </div>
               </div>
               <Toggle on={settings.autoPreview} onChange={(v) => set({ autoPreview: v })} label="深度解析文件用途" desc="为每个文件分析用途、所属软件和删除建议（默认开启）。" />

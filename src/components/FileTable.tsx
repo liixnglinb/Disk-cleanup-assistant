@@ -8,7 +8,7 @@ import ConfirmDialog from "./ConfirmDialog";
 import { useToast } from "../store/ToastContext";
 import { useSettings } from "../store/settings";
 
-const ROW = 24;
+const ROW = 44;
 const PAGE = 500;
 const OVERS = 8;
 
@@ -53,6 +53,9 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const requestVersion = useRef(0);
+  const lastQuery = useRef({ page: 0, append: false });
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [scrollTop, setScrollTop] = useState(0);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -97,7 +100,10 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
 
   const load = useCallback(async (pageToLoad: number, append: boolean) => {
     if (!scanId) return;
+    const version = ++requestVersion.current;
+    lastQuery.current = { page: pageToLoad, append };
     setLoading(true);
+    setLoadError(null);
     try {
       const r = await api.queryFiles({
         scan_id: scanId,
@@ -110,14 +116,15 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
         page: pageToLoad,
         page_size: PAGE,
       });
+      if (version !== requestVersion.current) return;
       if (append) setItems((p) => [...p, ...r.items]);
       else setItems(r.items);
       setTotal(r.total);
       setPage(pageToLoad);
     } catch (e) {
-      console.error(e);
+      if (version === requestVersion.current) setLoadError(e instanceof Error ? e.message : String(e));
     } finally {
-      setLoading(false);
+      if (version === requestVersion.current) setLoading(false);
     }
   }, [scanId, category, keyword, sort, recommendation, largeOnly, needsAiOnly]);
 
@@ -245,7 +252,7 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
   // F1：表头全选（已全部选中→清空可视；否则全选当前筛选全部）
   const onHeaderToggle = () => {
     if (allVisible) {
-      setSelectedMany(slice.filter((r) => r.is_locked === 0).map((r) => r.path), false);
+      clearSelection();
     } else {
       selectAllFiltered();
     }
@@ -271,7 +278,8 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
   const selectedPaths = Array.from(selected);
   const selectedBytes = items.filter((f) => selected.has(f.path)).reduce((s, f) => s + f.size, 0);
   const someSelected = selected.size > 0;
-  const selectedCount = Math.min(selected.size, total);
+  const selectedCount = selected.size;
+  const loadedSelected = items.filter((f) => selected.has(f.path)).length;
 
   // F1：表头全选三态（全选当前筛选全部 / 清空）
   const allVisible = slice.length > 0 && slice.every((r) => r.is_locked === 1 || selected.has(r.path));
@@ -288,13 +296,13 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
     <div className="panel file-panel animate-in">
       <div className="file-toolbar">
         <div className="toolbar">
-          <select value={category} onChange={(e) => setCategory(e.target.value)}>
+          <select aria-label="文件分类" value={category} onChange={(e) => setCategory(e.target.value)}>
             <option value="">全部分类</option>
             {Object.entries(CATEGORY_META).map(([k, v]) => (
               <option key={k} value={k}>{v.label}</option>
             ))}
           </select>
-          <select value={recommendation} onChange={(e) => setRecommendation(e.target.value)}>
+          <select aria-label="删除建议" value={recommendation} onChange={(e) => setRecommendation(e.target.value)}>
             <option value="">全部建议</option>
             <option value="recommend">推荐删除</option>
             <option value="caution">谨慎删除</option>
@@ -311,7 +319,7 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
           <input className="search" placeholder="搜索路径 / 用途 / 软件…" value={keyword} onChange={(e) => setKeyword(e.target.value)} />
           <label className="option-line" style={{ margin: 0, minWidth: 110 }}>
             <input type="checkbox" checked={largeOnly} onChange={(e) => setLargeOnly(e.target.checked)} />
-            <span className="muted" style={{ fontSize: 12 }}>仅看 &gt;{settings.largeFileMb}MB</span>
+            <span className="muted" style={{ fontSize: 12 }}>仅看 &gt;{settings.largeFileMb}MiB</span>
           </label>
           <label className="option-line" style={{ margin: 0, minWidth: 110 }}>
             <input type="checkbox" checked={needsAiOnly} onChange={(e) => setNeedsAiOnly(e.target.checked)} />
@@ -342,20 +350,20 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
         {aiError && <div className="notice error" style={{ margin: "8px 0 0" }}>{aiError}</div>}
       </div>
 
-      <div className={`file-list-head ${settings.autoPreview ? "" : "no-preview"}`}>
-        <span className="col-check"><input ref={headerRef} type="checkbox" checked={allVisible && someVisible} onChange={onHeaderToggle} title="全选当前筛选全部（再次点击清空）" /></span>
-        <span className="col-name">文件</span>
-        <span className="col-size">大小</span>
-        {settings.autoPreview && <><span className="col-purpose">用途（深度解析）</span><span className="col-owner">所属软件</span></>}
-        <span className="col-rec">删除建议</span>
-        <span className="col-mtime">最后修改</span>
-        <span className="col-path">路径</span>
-        <span className="col-actions" />
+<div className="file-table-scroll" role="table" aria-label="扫描文件明细" aria-rowcount={total + 1}><div className={`file-list-head ${settings.autoPreview ? "" : "no-preview"}`} role="row">
+        <span role="columnheader" className="col-check"><input ref={headerRef} aria-busy={selectBusy || undefined} type="checkbox" disabled={loading || selectBusy || !items.length} aria-label="全选当前筛选下可清理文件；已全选时清空全部选择" aria-checked={headerIndeterminate ? "mixed" : allVisible && someVisible} checked={allVisible && someVisible} onChange={onHeaderToggle} title="全选当前筛选全部；再次点击清空全部选择" /></span>
+        <span role="columnheader" className="col-name">文件</span>
+        <span role="columnheader" className="col-size">大小</span>
+        {settings.autoPreview && <><span role="columnheader" className="col-purpose">用途（深度解析）</span><span role="columnheader" className="col-owner">所属软件</span></>}
+        <span role="columnheader" className="col-rec">删除建议</span>
+        <span role="columnheader" className="col-mtime">最后修改</span>
+        <span role="columnheader" className="col-path">路径</span>
+        <span role="columnheader" className="col-actions" />
       </div>
 
-      <div className="file-list-body" ref={listRef} onScroll={onScroll}>
+<div className="file-list-body" ref={listRef} onScroll={onScroll}>
         <div className="virtual-spacer" style={{ height: offsetY }} />
-        {slice.map((rec) => {
+        {slice.map((rec, rowIndex) => {
           const locked = rec.is_locked === 1;
           const isSelected = selected.has(rec.path);
           const isLarge = rec.size >= largeBytes;
@@ -373,22 +381,22 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
             isSelected ? "row-selected" : "",
           ].join(" ");
           return (
-            <div className={rowClass} key={rec.id} style={{ height: ROW }}>
-              <span className="col-check">
-                <input type="checkbox" checked={isSelected} disabled={locked} onChange={(e) => setSelected(rec.path, e.target.checked)} />
+            <div className={rowClass} role="row" aria-rowindex={startIdx + rowIndex + 2} key={rec.id} style={{ height: ROW }}>
+              <span role="cell" className="col-check">
+                <input type="checkbox" aria-label={(locked ? "系统保护，无法选择：" : "选择文件：") + baseName(rec.path)} checked={isSelected} disabled={locked} onChange={(e) => setSelected(rec.path, e.target.checked)} />
               </span>
-              <span className="col-name" title={rec.path}>
+              <span role="cell" className="col-name" title={rec.path}>
                 {baseName(rec.path)}
                 <span className="file-tags">
                   {locked && <span className="tag danger" title="系统保护路径，不可删除"><Icon name="lock" size={12} />系统</span>}
-                  {isLarge && <span className="tag warn" title={`大于 ${settings.largeFileMb}MB`}><Icon name="disk" size={12} />大</span>}
+                  {isLarge && <span className="tag warn" title={`大于 ${settings.largeFileMb}MiB`}><Icon name="disk" size={12} />大</span>}
                   {needsAi && <span className="tag muted" title="用途未识别，待 AI 解析"><Icon name="info" size={12} />存疑</span>}
                   {aiDone && <span className="tag ok" title="已完成深度解析"><Icon name="check" size={12} />已解析</span>}
                 </span>
               </span>
               <span className="col-size num">{formatBytes(rec.size)}</span>
               {settings.autoPreview && (
-                <span className="col-purpose" title={aiRes ? (aiRes.detail || aiRes.purpose) : (rec.recommendation_reason || rec.purpose)}>
+                <span role="cell" className="col-purpose" title={aiRes ? (aiRes.detail || aiRes.purpose) : (rec.recommendation_reason || rec.purpose)}>
                   {aiRes ? aiRes.purpose : rec.purpose}
                   <span className="muted" style={{ fontSize: 11, marginLeft: 4 }}>({cat.label})</span>
                   {!locked && !aiRes && !aiHandled.current.has(rec.path) && (
@@ -404,11 +412,11 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
                 </span>
               )}
               {settings.autoPreview && (
-                <span className="col-owner" title={aiRes ? (aiRes.source || rec.owner) : rec.owner}>
+                <span role="cell" className="col-owner" title={aiRes ? (aiRes.source || rec.owner) : rec.owner}>
                   {aiRes ? (aiRes.source || rec.owner) : rec.owner}
                 </span>
               )}
-              <span className="col-rec">
+              <span role="cell" className="col-rec">
                 <span className={`tag ${toneOf(recMeta.cls).tone}`} title={rec.recommendation_reason}>
                   <Icon name={toneOf(recMeta.cls).icon} size={13} />{recMeta.label}
                 </span>
@@ -416,9 +424,9 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
                   <Icon name={toneOf(riskMeta.cls).icon} size={13} />{riskMeta.label}
                 </span>
               </span>
-              <span className="col-mtime">{formatTime(rec.mtime)}</span>
-              <span className="col-path" title={rec.path}>{dirName(rec.path)}</span>
-              <span className="col-actions">
+              <span role="cell" className="col-mtime">{formatTime(rec.mtime)}</span>
+              <span role="cell" className="col-path" title={rec.path}>{dirName(rec.path)}</span>
+              <span role="cell" className="col-actions">
                 {!locked && (
                   <>
                     <button className="row-act" title="在资源管理器中打开所在位置" onClick={() => api.reveal(rec.path).catch(() => toast.push({ kind: "error", message: "无法打开位置" }))}>
@@ -442,16 +450,19 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
           </div>
         )}
         {loading && items.length > 0 && <div className="loading-row">正在加载更多…</div>}
-        {!loading && items.length === 0 && (
+        {!loading && !loadError && items.length === 0 && (
           <div className="empty-row">
             {activeFiltersCount > 0 ? "没有匹配的文件，试试清除筛选条件" : "该盘符暂无文件记录，请先完成扫描"}
           </div>
         )}
       </div>
 
+      </div>
+      {loadError && <div className="notice error" role="alert">文件列表读取失败：{loadError}<button type="button" className="btn small" onClick={() => void load(lastQuery.current.page, lastQuery.current.append)}>重试读取</button></div>}
+
       <div className="file-bottom-bar">
         <span className="fbb-summary">
-          已选 <b>{selectedCount}</b> 个 · 合计 <b>{formatBytes(selectedBytes)}</b>
+          已选 <b>{selectedCount}</b> 个 · {loadedSelected === selectedCount ? "合计" : "已加载 " + loadedSelected + " 项大小"} <b>{formatBytes(selectedBytes)}</b>{loadedSelected !== selectedCount && <span className="selection-note">其余选项大小未读取；确认框列出全部路径。</span>}
         </span>
         <span className="muted" style={{ fontSize: 12 }}>筛选共 {total.toLocaleString()} 个 · 系统文件已自动排除</span>
         <div className="fbb-spacer" />

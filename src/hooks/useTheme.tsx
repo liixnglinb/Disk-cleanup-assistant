@@ -26,8 +26,8 @@ function initialTheme(): Theme {
   } catch {
     /* ignore */
   }
-  // 默认浅色（用户偏好浅色 UI）
-  return "light";
+  // 默认深色（首次启动即为黑色风格）
+  return "dark";
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {

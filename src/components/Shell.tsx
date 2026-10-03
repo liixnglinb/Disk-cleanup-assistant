@@ -1,6 +1,7 @@
 import React from "react";
 import TitleBar from "./TitleBar";
 import NavRail from "./NavRail";
+import ScanStateBanner from "./ScanStateBanner";
 
 export default function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -8,7 +9,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       <TitleBar />
       <div className="workspace">
         <NavRail />
-        <div className="content">{children}</div>
+        <main className="content" id="disk-main-content" tabIndex={-1}><ScanStateBanner />{children}</main>
       </div>
     </div>
   );

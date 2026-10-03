@@ -21,11 +21,11 @@ interface WorkspaceCtx {
 
 const Ctx = createContext<WorkspaceCtx | null>(null);
 
-export const SECTIONS: { key: SectionKey; label: string; icon: IconName }[] = [
-  { key: "overview", label: "概览", icon: "chart" },
-  { key: "clean", label: "清理", icon: "eraser" },
-  { key: "software", label: "软件", icon: "package" },
-  { key: "settings", label: "设置", icon: "settings" },
+export const SECTIONS: { key: SectionKey; label: string; desc: string; icon: IconName }[] = [
+  { key: "overview", label: "概览", desc: "磁盘空间与清理建议总览", icon: "chart" },
+  { key: "clean", label: "清理", desc: "扫描并安全删除缓存、大文件和重复文件", icon: "eraser" },
+  { key: "software", label: "软件", desc: "查看已装软件占用的磁盘空间", icon: "package" },
+  { key: "settings", label: "设置", desc: "主题、扫描参数与 AI 分析配置", icon: "settings" },
 ];
 
 /** 「清理」工作区里的三个来源分段 */

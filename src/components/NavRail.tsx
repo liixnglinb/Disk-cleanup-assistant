@@ -15,6 +15,10 @@ export default function NavRail() {
           aria-current={section === s.key ? "page" : undefined}
         >
           <Icon name={s.icon} size={20} />
+          <span className="rail-text">
+            <span className="rail-label">{s.label}</span>
+            <span className="rail-desc">{s.desc}</span>
+          </span>
         </button>
       ))}
     </nav>

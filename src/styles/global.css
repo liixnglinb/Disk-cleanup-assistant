@@ -117,7 +117,7 @@
 
   /* ================= 尺寸 ================= */
   --titlebar-h: 34px;
-  --nav-rail-w: 48px;
+  --nav-rail-w: 168px;
   --content-pad: 24px;
   /* 密度基线：表格行 / 表头 / 输入控件（依据 VS Code 行高 22、GitHub Desktop 文件行 29） */
   --row-h: 24px;

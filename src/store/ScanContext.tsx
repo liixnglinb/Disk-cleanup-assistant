@@ -33,6 +33,7 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
     try {
       const st = await api.statistics(scanId);
       setStatistics(st);
+      setError(null);
     } catch (e) {
       setError(String(e instanceof Error ? e.message : e));
     }

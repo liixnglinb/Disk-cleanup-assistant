@@ -59,11 +59,21 @@
 }
 .rail-item {
   position: relative;
-  width: 36px; height: 36px; border: 0; border-radius: var(--radius-sm);
+  width: calc(var(--nav-rail-w) - 16px); height: 40px; border: 0; border-radius: var(--radius-sm);
   background: transparent; color: var(--text-muted); cursor: pointer;
-  display: inline-flex; align-items: center; justify-content: center;
+  display: inline-flex; align-items: center; justify-content: flex-start;
+  gap: 8px; padding: 0 8px;
   transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
+.rail-item .rail-text {
+  display: flex; flex-direction: column; min-width: 0; text-align: left;
+}
+.rail-item .rail-label { font-size: var(--fs-base); font-weight: var(--fw-medium); line-height: 1.2; }
+.rail-item .rail-desc {
+  font-size: var(--fs-xs); color: var(--text-dim); line-height: 1.25;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rail-item.active .rail-desc { color: var(--text-muted); }
 .rail-item:hover { background: var(--surface-hover); color: var(--text); }
 .rail-item.active { background: var(--primary-soft); color: var(--primary); }
 .rail-item.active::before {
@@ -419,7 +429,8 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
 .setting-label { font-weight: var(--fw-semibold); color: var(--text); font-size: var(--fs-md); }
 .setting-desc { color: var(--text-muted); font-size: var(--fs-base); margin-top: 4px; line-height: 1.6; max-width: 560px; }
 .setting-control { flex-shrink: 0; display: flex; align-items: center; gap: 10px; }
-.setting-control input[type="number"] { width: 96px; }
+.setting-control input[type="number"],
+.setting-control input.large-file-mb { width: 96px; }
 .settings-footer {
   display: flex; align-items: center; justify-content: flex-end; gap: 10px;
   margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);

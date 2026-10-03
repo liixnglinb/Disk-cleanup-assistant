@@ -1,8 +1,9 @@
 export function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes)) return "未知";
   if (!bytes) return "0 B";
   const n = Math.abs(bytes);
   if (n < 1024) return `${bytes} B`;
-  const units = ["KB", "MB", "GB", "TB"];
+  const units = ["KiB", "MiB", "GiB", "TiB"];
   let v = n;
   let i = -1;
   do {
