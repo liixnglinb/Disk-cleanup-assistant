@@ -16,6 +16,9 @@ export function formatBytes(bytes: number): string {
 export function formatTime(ms: number | null | undefined): string {
   if (!ms) return "-";
   const d = new Date(ms * 1000);
+  // 非法日期返回 "-"，不返回 "NaN-NaN-NaN"：文件表一次渲染上千行，
+  // 一列全是 NaN 会把整张表的排版打乱，且用户无从判断是数据问题还是程序问题。
+  if (Number.isNaN(d.getTime())) return "-";
   const p = (x: number) => String(x).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }

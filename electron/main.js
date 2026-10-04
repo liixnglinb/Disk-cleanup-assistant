@@ -8,6 +8,24 @@ const { rankFeedsBySpeed } = require("./update_probe");
 // 自定义协议：网页可通过 local-toolbox:// 唤起本软件
 const PROTOCOL = "local-toolbox";
 
+/**
+ * 标题栏 overlay 的高度与配色 —— 必须与 src/styles/global.css 的
+ * --titlebar-h / --bg / --text 保持一致。
+ *
+ * 为什么要在主进程再写一份：Electron 的 titleBarOverlay 由主进程设置，
+ * 渲染进程无法直接改窗口 chrome；CSS 变量到不了这里。三处硬编码曾经各写各的
+ * （标题栏 CSS 34px、overlay 34px、配色还是上一版暖灰），改成常量后至少
+ * 本文件内不会再漂移。改标题栏高度时仍需同步 global.css 的 --titlebar-h。
+ *
+ * 配色取自设计系统 v9（方案二 Tokens）：浅色 #F9F9F9 / #111827，
+ * 暗色 #121212 / #F3F4F6。
+ */
+const OVERLAY = {
+  height: 64,
+  light: { color: "#F9F9F9", symbol: "#111827", bg: "#F9F9F9" },
+  dark: { color: "#121212", symbol: "#F3F4F6", bg: "#121212" },
+};
+
 let backendHandle = null;
 let mainWindow = null;
 
@@ -202,8 +220,8 @@ if (!gotLock) {
       // 保留原生 NC 区（贴边吸附/缩放交给系统），仅隐藏标题栏并自绘同一行内容。
       // 不用 frame:false —— 那会丢掉系统吸附行为，且需自补缩放命中区。
       titleBarStyle: "hidden",
-      titleBarOverlay: { color: "#F7F7F5", symbolColor: "#16161A", height: 34 },
-      backgroundColor: "#EFEFED",
+      titleBarOverlay: { color: OVERLAY.light.color, symbolColor: OVERLAY.light.symbol, height: OVERLAY.height },
+      backgroundColor: OVERLAY.light.bg,
       webPreferences: {
         preload: path.join(__dirname, "preload.js"),
         contextIsolation: true,
@@ -263,12 +281,13 @@ if (!gotLock) {
   ipcMain.handle("win:set-titlebar-overlay", (_e, theme) => {
     if (!mainWindow || mainWindow.isDestroyed()) return { ok: false };
     const dark = theme === "dark";
+    const o = dark ? OVERLAY.dark : OVERLAY.light;
     mainWindow.setTitleBarOverlay({
-      color: dark ? "#17181C" : "#F7F7F5",
-      symbolColor: dark ? "#EDEEF1" : "#16161A",
-      height: 34,
+      color: o.color,
+      symbolColor: o.symbol,
+      height: OVERLAY.height,
     });
-    mainWindow.setBackgroundColor(dark ? "#101114" : "#EFEFED");
+    mainWindow.setBackgroundColor(o.bg);
     return { ok: true };
   });
 

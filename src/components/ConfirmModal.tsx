@@ -31,8 +31,8 @@ export default function ConfirmModal({
 
   return (
     <div className="modal-mask" onClick={() => !busy && onClose()}>
-      <div className="modal" ref={dialogRef} role="alertdialog" aria-modal="true" aria-label={title} aria-busy={busy} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
-        <div className={`modal-icon ${danger ? "warn-icon" : ""}`}>
+      <div className={`modal ${danger ? "is-danger" : ""}`} ref={dialogRef} role="alertdialog" aria-modal="true" aria-label={title} aria-busy={busy} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
+        <div className={`modal-icon ${danger ? "danger-icon" : "warn-icon"}`}>
           <Icon name="alert" size={22} />
         </div>
         <h3>{title}</h3>

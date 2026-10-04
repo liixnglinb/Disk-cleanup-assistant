@@ -1,7 +1,6 @@
 import React, { useEffect } from "react";
 import Icon from "./icons";
 import ScanControl from "./ScanControl";
-import UpdateBox from "./UpdateBox";
 import { SECTIONS, useWorkspace } from "../store/workspace";
 import { useTheme } from "../hooks/useTheme";
 
@@ -31,8 +30,8 @@ export default function TitleBar() {
       </div>
       <ScanControl />
       <div className="titlebar-drag" />
+      {/* 更新胶囊已移到右下角浮动（见 Shell），标题栏只留抽屉与主题 */}
       <div className="titlebar-actions no-drag">
-        <UpdateBox />
         <button className={`icon-btn ${drawer === "kb" ? "on" : ""}`} title="目录百科" onClick={() => openDrawer("kb")}>
           <Icon name="search" size={16} />
         </button>

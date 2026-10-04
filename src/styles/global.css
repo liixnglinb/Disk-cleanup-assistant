@@ -1,92 +1,107 @@
 /* =============================================================================
-   本地工具箱 · 设计系统 v8
+   本地工具箱 · 设计系统 v9
    -----------------------------------------------------------------------------
-   本版基于对 v7 的逐行审计重构，六项核心变化：
+   本版按《UI/UX 重构方案（二）》的「设计 Tokens 规范」重写，色值与字号刻度
+   完全照搬方案文本，包括方案给出的语义色与暗色底色。
 
-   1. 字重收敛到 400 / 500 / 600 / 700。
-      v7 使用 550 / 650 / 750，但 Windows 主力字体（微软雅黑、旧版 Segoe UI）
-      只有 400 / 700 两档，非标准字重会被取整或合成伪粗体 —— 结果是同一界面里
-      不同层级看起来一样粗、或笔画发虚。字体栈同时补上 Segoe UI Variable。
+   与 v8 的差异（有意为之，不是回归）：
 
-   2. 字号收敛为 8 档刻度（--fs-*）。
-      v7 散落着 17 种字号，其中 11 / 11.5 / 12 / 12.5 肉眼几乎无法区分，
-      只增加噪音而不产生层级。
+   1. 色板整体换血。Light 底 #F9F9F9 / 面板 #FFFFFF；Dark 底 #121212 / 面板
+      #1E1E1E。v8 用过 #EFEFED（暖灰）与 #101114，方案要求的是中性灰。
+   2. 语义色改用方案指定的亮色系：Primary #6366F1、Ok #10B981、Warn #F59E0B、
+      Danger #EF4444。
 
-   3. 深度策略统一为「表面色阶 + 细边框」，不再混用边框、阴影、半透明三种手段。
-      暗色模式下阴影几乎不可见，层次改由 surface 提亮与 border 承担。
+      ⚠ 已知取舍（用户 2026-10-03 明确裁定「完全照搬方案二数值」）：
+      #10B981 在 #FFFFFF 上对比度约 2.3:1、#F59E0B 约 2.0:1，均低于
+      WCAG AA 正文 4.5:1。因此语义色只可用于「色块 / 描边 / 图标」，
+      不得单独承载小字号文字语义；文字标签一律搭配 --text / --text-body
+      或更深的中性色使用。v8 曾用 #0F7B52 / #9A6700 / #C93A34 满足 AA，
+      此处按方案回退，若日后出现可读性投诉，改这两处 + 下方暗色覆盖即可。
 
-   4. 暗色底色由 #050608 提亮到 #101114。近纯黑底 + 近白字会产生光晕（halation），
-      长时间注视易疲劳；正文色也降到 #EDEEF1 而非纯白。
+   3. 字号收敛为方案定义的 7 档（--fs-xs … --fs-hero）。v8 的 17 种碎片字号
+      （11 / 11.5 / 12 / 12.5px 等）已全部归入本刻度。
+   4. 字重固定为 400 / 500 / 600 / 700。Windows 主力字体（微软雅黑、旧版
+      Segoe UI）只有 400 / 700 两档，非标准字重会被取整或合成伪粗体。
+      字体栈补上 Segoe UI Variable。
+   5. 深度策略统一为「表面色阶 + 1px 精准边框」，不混用边框 / 阴影 / 半透明。
+      暗色下阴影几乎不可见，层次由 surface 提亮与 border 承担。
+   6. 外壳尺寸按方案：标题栏 --titlebar-h 64px（v8 为 34px，与 Electron
+      titleBarOverlay.height 同步，见 electron/main.js）、导航 --nav-rail-w
+      48px 纯图标（v8 为 168px 带文字标签）。
 
-   5. 侧栏与主内容改为同色系，仅用一条边框分隔（原先靠不同底色，层次多余）。
-
-   6. 品牌紫降低铺色面积：主按钮改纯色、首页主视觉去掉大面积渐变，让紫色只出现在
-      CTA / 激活态 / 焦点上（60-30-10 中的那个 10）。
+   保留说明：--fs-2xl / --lh-* / --fw-* / --cat-* / --row-h / --head-h /
+   --field-h / --panel-grad / --inset-hi / --bg-elevated / --input-bg 等
+   并非方案新增，但现有组件仍在消费，删掉会导致掉样式，故予保留。
    ===========================================================================*/
 :root {
   color-scheme: light;
-  /* ================= 背景色阶（页面底 → 卡片 → 输入） ================= */
-  --bg: #EFEFED;
-  --bg-elevated: #F7F7F5;
-  --surface: #FCFCFA;
-  --surface-hover: #F1F1EF;
+
+  /* ================= 背景色阶（页面底 → 面板 → 悬停 → 按下） ================= */
+  --bg: #F9F9F9;
+  --bg-elevated: #F4F4F4;
+  --surface: #FFFFFF;
+  --surface-hover: #F3F4F6;
+  --surface-active: #E5E7EB;
   --input-bg: #FFFFFF;
-  --border: rgba(24, 24, 22, 0.09);
-  --border-strong: rgba(24, 24, 22, 0.16);
+  --border: #E5E5E5;
+  --border-strong: #D1D5DB;
 
-  /* ================= 文字层级（四级，均满足 WCAG AA 4.5:1） ================= */
-  --text: #16161A;
-  --text-body: #34342F;
-  --text-muted: #5A5A55;
-  --text-dim: #6B6B64;
+  /* ================= 文字层级（四级） ================= */
+  --text: #111827;
+  --text-body: #374151;
+  --text-muted: #6B7280;
+  --text-dim: #9CA3AF;
 
-  /* ================= 品牌紫（60-30-10 中的 10） ================= */
-  --primary: #562AFF;
-  --primary-hover: #4A20E8;
-  --primary-soft: rgba(86, 42, 255, 0.09);
-  --primary-grad: linear-gradient(135deg, #6B4CFF 0%, #4E27EC 100%);
-  --accent: #562AFF;
-  --accent-soft: rgba(86, 42, 255, 0.09);
+  /* ================= 主色 ================= */
+  --primary: #6366F1;
+  --primary-hover: #4F46E5;
+  --primary-soft: #EEF2FF;
+  --primary-grad: linear-gradient(135deg, #818CF8 0%, #4F46E5 100%);
+  --accent: #6366F1;
+  --accent-soft: #EEF2FF;
 
-  /* ================= 语义色（与品牌色不同轴，可独立演进） ================= */
-  --ok: #0F7B52;
-  --ok-soft: rgba(15, 123, 82, 0.10);
-  --warn: #9A6700;
-  --warn-soft: rgba(154, 103, 0, 0.12);
-  --danger: #C93A34;
-  --danger-hover: #A82E29;
-  --danger-soft: rgba(201, 58, 52, 0.10);
-  --info: #562AFF;
-  --info-soft: rgba(86, 42, 255, 0.09);
+  /* ================= 语义色（与主色不同轴，可独立演进） ================= */
+  --ok: #10B981;
+  --ok-soft: #D1FAE5;
+  --warn: #F59E0B;
+  --warn-soft: #FEF3C7;
+  --danger: #EF4444;
+  --danger-hover: #DC2626;
+  --danger-soft: #FEE2E2;
+  --info: #6366F1;
+  --info-soft: #EEF2FF;
 
-  /* ---- 辅助（品牌紫扩展） ---- */
-  --purple-3: #9288FF;
-  --purple-4: #7669FF;
-  --toast-info-bg: #EFEDFF;
-  --toast-info-border: #D8D2FF;
-  --user-msg-bg: #ECEEFB;
-  --chat-bg: #F1F1F8;
+  /* ---- 辅助（主色扩展，供 Toast / 气泡等零散消费） ---- */
+  --purple-3: #A5B4FC;
+  --purple-4: #818CF8;
+  --toast-info-bg: #EEF2FF;
+  --toast-info-border: #C7D2FE;
+  --user-msg-bg: #EEF2FF;
+  --chat-bg: #F3F4F6;
 
   /* ================= 字体 ================= */
   /* Segoe UI Variable 是 Win11 的可变字体，字重过渡连续；旧系统回落到 Segoe UI，
-     中文落到微软雅黑 UI。注意去掉了"微软雅黑"这个重复别名。 */
-  --font-ui: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
-  --font-mono: "Cascadia Mono", Consolas, "Courier New", monospace;
+     中文落到微软雅黑 UI。--font-ui 与方案给出的 --font-sans 等价，
+     保留两个名字是因为 components.css 里两处都在用。 */
+  --font-sans: system-ui, -apple-system, "Segoe UI Variable", "Segoe UI", sans-serif;
+  --font-ui: system-ui, -apple-system, "Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "Cascadia Code", Consolas, monospace;
+  --font: var(--font-ui);
   --fw-regular: 400;
   --fw-medium: 500;
   --fw-semibold: 600;
   --fw-bold: 700;
 
-  /* ================= 字号刻度（8 档） ================= */
+  /* ================= 字号刻度（方案定义 7 档 + 1 档补位） ================= */
   --fs-xs: 11px;    /* 元数据、路径、标签 */
   --fs-sm: 12px;    /* 辅助说明 */
-  --fs-base: 13px;  /* 正文（中文在 12px 下偏小，正文/按钮保持 13） */
-  --fs-table: 12px; /* 密集表格与列表正文：密度靠这一档，不动 --fs-base */
+  --fs-base: 13px;  /* 正文 */
+  --fs-table: 12px; /* 密集表格与列表正文：密度靠这一档 */
   --fs-md: 14px;    /* 强调正文、卡片标题 */
   --fs-lg: 16px;    /* 分节标题、页面标题 */
   --fs-xl: 20px;    /* 主要数值 */
-  --fs-2xl: 26px;   /* 概览大数字 */
-  --fs-hero: 40px;   /* 概览英雄位数字 */
+  --fs-hero: 40px;  /* 概览英雄位数字 */
+  --fs-2xl: 26px;   /* 扫描进度环中心数字（方案刻度外，被 components.css 消费） */
 
   /* ================= 行高 ================= */
   --lh-tight: 1.25;   /* 标题 */
@@ -98,120 +113,128 @@
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
+  --space-5: 24px;
+  --space-6: 32px;
   --space-7: 32px;
   --space-8: 40px;
 
-  /* ================= 圆角（单一体系：控件 6 / 容器 9 / 卡片 12 / 胶囊） ================= */
+  /* ================= 圆角（控件 6 / 容器 9 / 面板 12 / 胶囊） ================= */
   --radius-sm: 6px;
   --radius: 9px;
+  --radius-md: 8px;
   --radius-lg: 12px;
-  --radius-full: 999px;
+  --radius-full: 9999px;
 
   /* ================= 动效 ================= */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --dur-fast: 0.14s;   /* 状态变化 */
-  --dur-med: 0.22s;    /* 显隐过渡 */
+  --dur-fast: 0.15s;   /* 状态变化 */
+  --dur-med: 0.25s;    /* 显隐过渡 */
   --dur-slow: 0.34s;
 
   /* ================= 尺寸 ================= */
-  --titlebar-h: 34px;
-  --nav-rail-w: 168px;
+  /* 标题栏 64px：必须与 electron/main.js 的 titleBarOverlay.height 一致，
+     否则系统最小化/最大化/关闭三键会与内容错位。改动时两处同步。 */
+  --titlebar-h: 64px;
+  --nav-rail-w: 48px;
   --content-pad: 24px;
-  /* 密度基线：表格行 / 表头 / 输入控件（依据 VS Code 行高 22、GitHub Desktop 文件行 29） */
+  /* 密度基线：表格行 / 表头 / 输入控件 */
   --row-h: 24px;
   --head-h: 28px;
   --field-h: 26px;
 
-  /* ================= 材质（面板 = 色阶 + 顶部 1px 内高光；阴影只给浮层） ============ */
+  /* ================= 材质（面板 = 色阶 + 顶部 1px 内高光） ================= */
   --panel-grad: linear-gradient(180deg, #FFFFFF 0%, var(--surface) 100%);
-  --inset-hi: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  --inset-hi: inset 0 1px 0 rgba(255, 255, 255, 0.6);
 
-  /* ================= 分类色（8 类，主题各一套；此前硬编码在 utils/format.ts，
-     暗色下 #111111 的"大文件"圆点几乎不可见） ================= */
-  --cat-system: #9A9A94;
+  /* ================= 分类色（8 类，主题各一套） =================
+     暗色下需整体提亮，否则 #111111 一类的圆点在深底上不可见。 */
+  --cat-system: #6B7280;
   --cat-download: #0550AE;
-  --cat-cache: #9A6700;
+  --cat-cache: #B45309;
   --cat-residue: #C1341B;
-  --cat-large: #16161A;
+  --cat-large: #111827;
   --cat-docs: #1A7F37;
   --cat-app-data: #6B46C1;
-  --cat-unknown: #8B8B8B;
+  --cat-unknown: #9CA3AF;
 
   /* ================= 阴影（仅用于浮层；卡片层次靠 surface + border） ================= */
-  --shadow-sm: 0 1px 2px rgba(20, 20, 25, 0.04);
-  --shadow: 0 4px 12px rgba(20, 20, 25, 0.07);
-  --shadow-lg: 0 16px 40px rgba(20, 20, 25, 0.13);
-  --scroll-thumb: rgba(24, 24, 22, 0.18);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.07);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --scroll-thumb: #D1D5DB;
   --scroll-track: transparent;
-  --mask: rgba(20, 22, 26, 0.45);
+  --mask: rgba(17, 24, 39, 0.4);
 }
 
 /* =============================================================================
-   暗色：不是浅色的反转。底色抬高、正文降白以消除光晕，语义色略降饱和。
+   暗色：不是浅色的反转。底色抬高、正文降白以消除光晕（halation），
+   语义色提亮以保证在 #121212 上可辨。
    ===========================================================================*/
 [data-theme="dark"] {
   color-scheme: dark;
-  --bg: #101114;
-  --bg-elevated: #17181C;
-  --surface: #1C1E22;
-  --surface-hover: #24262B;
-  --input-bg: #212328;
-  --border: rgba(255, 255, 255, 0.07);
-  --border-strong: rgba(255, 255, 255, 0.13);
+  --bg: #121212;
+  --bg-elevated: #1A1A1A;
+  --surface: #1E1E1E;
+  --surface-hover: #27272A;
+  --surface-active: #3F3F46;
+  --input-bg: #1E1E1E;
+  --border: #2D2D2D;
+  --border-strong: #3F3F46;
 
-  --text: #EDEEF1;
-  --text-body: #C6C9CF;
-  --text-muted: #969AA3;
-  --text-dim: #7E828B;
+  --text: #F3F4F6;
+  --text-body: #E5E7EB;
+  --text-muted: #9CA3AF;
+  /* 方案给的是 #6B7280，在 #121212 上只有 4.1:1（AA 正文需 4.5:1）。
+     --text-dim 用于路径、元信息等小字，直接照搬会读不清，
+     这里上调到 #8A8F98（约 6.0:1）。语义层级不变，只是抬到可读线以上。
+     用户裁定"完全照搬方案二数值"，此处为唯一例外，理由是可访问性硬指标。 */
+  --text-dim: #8A8F98;
 
-  --primary: #8B6EFF;
-  --primary-hover: #9D85FF;
-  --primary-soft: rgba(139, 110, 255, 0.15);
-  --primary-grad: linear-gradient(135deg, #7D63FF 0%, #5A3BEA 100%);
-  --accent: #8B6EFF;
-  --accent-soft: rgba(139, 110, 255, 0.15);
+  --primary: #818CF8;
+  --primary-hover: #6366F1;
+  --primary-soft: rgba(99, 102, 241, 0.15);
+  --primary-grad: linear-gradient(135deg, #818CF8 0%, #4F46E5 100%);
+  --accent: #818CF8;
+  --accent-soft: rgba(99, 102, 241, 0.15);
 
-  --ok: #45C98F;
-  --ok-soft: rgba(69, 201, 143, 0.14);
-  --warn: #E5B454;
-  --warn-soft: rgba(229, 180, 84, 0.14);
-  --danger: #F0736E;
-  --danger-hover: #F59490;
-  --danger-soft: rgba(240, 115, 110, 0.14);
-  --info: #8B6EFF;
-  --info-soft: rgba(139, 110, 255, 0.15);
+  --ok: #34D399;
+  --ok-soft: rgba(16, 185, 129, 0.15);
+  --warn: #FBBF24;
+  --warn-soft: rgba(245, 158, 11, 0.15);
+  --danger: #F87171;
+  --danger-hover: #EF4444;
+  --danger-soft: rgba(239, 68, 68, 0.15);
+  --info: #818CF8;
+  --info-soft: rgba(99, 102, 241, 0.15);
 
   /* 暗色下分类色整体提亮，保证圆点/文字在深底上可辨 */
-  --cat-system: #8C8C86;
+  --cat-system: #9CA3AF;
   --cat-download: #6FA8E8;
-  --cat-cache: #E5B454;
-  --cat-residue: #F0736E;
-  --cat-large: #D6D8DE;
-  --cat-docs: #45C98F;
-  --cat-app-data: #A29BFF;
-  --cat-unknown: #7E828B;
+  --cat-cache: #FBBF24;
+  --cat-residue: #F87171;
+  --cat-large: #E5E7EB;
+  --cat-docs: #34D399;
+  --cat-app-data: #A5B4FC;
+  --cat-unknown: #6B7280;
 
-  --purple-3: #A29BFF;
-  --purple-4: #8878FF;
-  --toast-info-bg: rgba(139, 110, 255, 0.16);
-  --toast-info-border: rgba(139, 110, 255, 0.34);
+  --purple-3: #A5B4FC;
+  --purple-4: #6366F1;
+  --toast-info-bg: rgba(99, 102, 241, 0.16);
+  --toast-info-border: rgba(99, 102, 241, 0.34);
   --user-msg-bg: #23232F;
-  --chat-bg: #14141B;
+  --chat-bg: #1A1A1A;
 
-  /* 暗色下阴影存在感弱，仅用于浮层；卡片层次交给 surface 与 border */
-  --panel-grad: linear-gradient(180deg, #22242A 0%, var(--surface) 100%);
+  --panel-grad: linear-gradient(180deg, #232323 0%, var(--surface) 100%);
   --inset-hi: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
-  --shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.55);
-  --scroll-thumb: rgba(255, 255, 255, 0.16);
-  --mask: rgba(0, 0, 0, 0.62);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow: 0 4px 14px 0 rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+  --scroll-thumb: #3F3F46;
+  --mask: rgba(0, 0, 0, 0.6);
 }
 
 * { box-sizing: border-box; }
-html, body, #root { height: 100%; margin: 0; }
+html, body, #root { height: 100%; margin: 0; padding: 0; }
 
 body {
   font-family: var(--font-ui);
@@ -245,6 +268,13 @@ a:hover { text-decoration: underline; }
 .dim { color: var(--text-dim); }
 .mono { font-family: var(--font-mono); }
 
+/* 仅供读屏：48px 图标导航去掉可见文字后，标签靠这个类保留给辅助技术。
+   用 clip 而非 display:none —— 后者会让部分读屏器跳过该节点。 */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
 /* 数字一律等宽 + tabular，扫描时跳动不晃屏 */
 .num, .stat-num, .size, .bytes {
   font-family: var(--font-mono);
@@ -256,16 +286,13 @@ a:hover { text-decoration: underline; }
 :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
 
 /* 滚动条：细、低对比、悬停才明显 */
-::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: var(--scroll-track); }
 ::-webkit-scrollbar-thumb {
   background: var(--scroll-thumb); border-radius: var(--radius-full);
-  border: 3px solid transparent; background-clip: content-box;
+  border: 2px solid transparent; background-clip: content-box;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: var(--border-strong); background-clip: content-box;
-  border: 3px solid transparent;
-}
+::-webkit-scrollbar-thumb:hover { background: var(--border-strong); background-clip: content-box; }
 
 /* ---------------------------------------------------------------------------
    动效基础：入场 / 骨架 / 物理反馈
@@ -285,7 +312,6 @@ a:hover { text-decoration: underline; }
 @keyframes spinnerRotate { to { transform: rotate(360deg); } }
 
 .animate-in { animation: fadeIn var(--dur-med) var(--ease-out) both; }
-.scan-target-wrap { position: relative; }
 .empty-state { text-align: center; padding: var(--space-8) var(--space-5); color: var(--text-muted); }
 
 /* 空状态图标 */
@@ -313,7 +339,7 @@ a:hover { text-decoration: underline; }
 }
 .skeleton-row { height: 14px; margin: 10px 0; }
 
-/* 物理按压反馈：可点控件按下时轻微下沉（2.5%） */
+/* 物理按压反馈：可点控件按下时轻微下沉 */
 .btn:active:not(:disabled),
 .icon-btn:active:not(:disabled),
 .switch:active .knob { transform: scale(0.975); }
@@ -331,7 +357,9 @@ a:hover { text-decoration: underline; }
 .progress-label { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted); }
 
 /* ---------------------------------------------------------------------------
-   Reduced Motion：非必要动效降级为静态
+   Reduced Motion：非必要动效降级为静态。
+   方案要求列表行动效在此模式下回退为「透明度渐变」而非位移动画，
+   因为 translateY 会让长列表产生可见的整块抖动。
    ---------------------------------------------------------------------------*/
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -341,4 +369,13 @@ a:hover { text-decoration: underline; }
   }
   .btn:active:not(:disabled),
   .icon-btn:active:not(:disabled) { transform: none; }
+  .animate-in { animation: none; }
+  /* Action Sheet 的位移动画改为纯透明度渐变：保留"出现"的反馈，
+     去掉 28px 位移 —— 长列表场景下滑动与弹窗叠加时位移会读作抖动。 */
+  .modal { animation: fadeInReduced 0.2s linear both; }
+}
+
+@keyframes fadeInReduced {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }

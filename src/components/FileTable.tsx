@@ -5,12 +5,12 @@ import Icon from "./icons";
 import type { AiFileResult, FileRecord } from "../types";
 import { baseName, CATEGORY_META, dirName, formatBytes, formatTime, RECOMMENDATION_META, RISK_META } from "../utils/format";
 import ConfirmDialog from "./ConfirmDialog";
+import DataTable from "./DataTable";
 import { useToast } from "../store/ToastContext";
 import { useSettings } from "../store/settings";
 
 const ROW = 44;
 const PAGE = 500;
-const OVERS = 8;
 
 /**
  * 行内状态一律"图标着色 + 中性文字"，彩色胶囊只留给聚合计数。
@@ -57,8 +57,9 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
   const requestVersion = useRef(0);
   const lastQuery = useRef({ page: 0, append: false });
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [scrollTop, setScrollTop] = useState(0);
-  const listRef = useRef<HTMLDivElement | null>(null);
+  // 虚拟滚动的位置状态已移入 DataTable；这里只保留"重置滚动"的触发信号：
+  // 筛选/盘符变化后列表要回到顶部，否则用户会停在新筛选结果的中间位置。
+  const resetScrollKey = `${scanId}|${category}|${sort}|${keyword}|${recommendation}|${largeOnly}|${needsAiOnly}`;
   const toast = useToast();
   // 设置：大文件阈值 / 自动预览 / 已 AI 分析标记（会话内避免重复标“存疑”）
   const settings = useSettings();
@@ -131,8 +132,6 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
   useEffect(() => {
     setItems([]);
     setTotal(0);
-    setScrollTop(0);
-    if (listRef.current) listRef.current.scrollTop = 0;
     if (scanId) load(0, false);
   }, [scanId, category, sort, keyword, recommendation, largeOnly, needsAiOnly, load]);
 
@@ -258,37 +257,24 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
     }
   };
 
-  const onScroll = useCallback(() => {
-    const el = listRef.current;
-    if (!el) return;
-    setScrollTop(el.scrollTop);
-    const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - ROW * 4;
-    if (nearBottom && items.length < total && !loading) {
-      load(page + 1, true);
-    }
-  }, [items.length, total, loading, page, load]);
-
-  const startIdx = Math.max(0, Math.floor(scrollTop / ROW) - OVERS);
-  // 视口高度取自真实容器，不再写死 560：容器高度会随窗口自适应（CSS 里是 min(540px, 100vh-…)）
-  const viewH = listRef.current?.clientHeight || 540;
-  const endIdx = Math.min(items.length, Math.ceil((scrollTop + viewH) / ROW) + OVERS);
-  const slice = items.slice(startIdx, endIdx);
-  const offsetY = startIdx * ROW;
-
   const selectedPaths = Array.from(selected);
   const selectedBytes = items.filter((f) => selected.has(f.path)).reduce((s, f) => s + f.size, 0);
   const someSelected = selected.size > 0;
   const selectedCount = selected.size;
   const loadedSelected = items.filter((f) => selected.has(f.path)).length;
 
-  // F1：表头全选三态（全选当前筛选全部 / 清空）
-  const allVisible = slice.length > 0 && slice.every((r) => r.is_locked === 1 || selected.has(r.path));
-  const someVisible = slice.some((r) => selected.has(r.path));
+  // F1：表头全选三态。
+  // 口径说明（有意偏离原实现）：原代码用 DataTable 之前的"可视切片 slice"算 allVisible，
+  // 但 slice 随滚动变化 —— 用户滚到中间点表头时，勾选态会随可视窗口抖动。
+  // 现改为对"已加载集合"求全选：分页是追加式加载，已加载集合就是当前可操作范围的上界，
+  // 勾选态在整个滚动过程中保持稳定。锁定（系统保护）行不参与，视为"天然已处理"。
+  const allVisible = items.length > 0 && items.every((r) => r.is_locked === 1 || selected.has(r.path));
+  const someVisible = items.some((r) => selected.has(r.path));
   const headerIndeterminate = someVisible && !allVisible;
   const headerRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => {
     if (headerRef.current) headerRef.current.indeterminate = headerIndeterminate;
-  }, [headerIndeterminate, slice.length]);
+  }, [headerIndeterminate, items.length]);
 
   const activeFiltersCount = (category ? 1 : 0) + (recommendation ? 1 : 0) + (largeOnly ? 1 : 0) + (needsAiOnly ? 1 : 0) + (keyword ? 1 : 0);
 
@@ -350,20 +336,55 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
         {aiError && <div className="notice error" style={{ margin: "8px 0 0" }}>{aiError}</div>}
       </div>
 
-<div className="file-table-scroll" role="table" aria-label="扫描文件明细" aria-rowcount={total + 1}><div className={`file-list-head ${settings.autoPreview ? "" : "no-preview"}`} role="row">
-        <span role="columnheader" className="col-check"><input ref={headerRef} aria-busy={selectBusy || undefined} type="checkbox" disabled={loading || selectBusy || !items.length} aria-label="全选当前筛选下可清理文件；已全选时清空全部选择" aria-checked={headerIndeterminate ? "mixed" : allVisible && someVisible} checked={allVisible && someVisible} onChange={onHeaderToggle} title="全选当前筛选全部；再次点击清空全部选择" /></span>
-        <span role="columnheader" className="col-name">文件</span>
-        <span role="columnheader" className="col-size">大小</span>
-        {settings.autoPreview && <><span role="columnheader" className="col-purpose">用途（深度解析）</span><span role="columnheader" className="col-owner">所属软件</span></>}
-        <span role="columnheader" className="col-rec">删除建议</span>
-        <span role="columnheader" className="col-mtime">最后修改</span>
-        <span role="columnheader" className="col-path">路径</span>
-        <span role="columnheader" className="col-actions" />
-      </div>
-
-<div className="file-list-body" ref={listRef} onScroll={onScroll}>
-        <div className="virtual-spacer" style={{ height: offsetY }} />
-        {slice.map((rec, rowIndex) => {
+      <DataTable
+        items={items}
+        rowKey={(rec) => String(rec.id)}
+        rowHeight={ROW}
+        variant={settings.autoPreview ? undefined : "no-preview"}
+        ariaLabel="扫描文件明细"
+        totalCount={total}
+        loading={loading}
+        resetKey={resetScrollKey}
+        onReachEnd={() => {
+          if (items.length < total && !loading) load(page + 1, true);
+        }}
+        columns={[
+          { key: "name", label: "文件" },
+          { key: "size", label: "大小" },
+          ...(settings.autoPreview
+            ? [{ key: "purpose", label: "用途（深度解析）" }, { key: "owner", label: "所属软件" }]
+            : []),
+          { key: "rec", label: "删除建议" },
+          { key: "mtime", label: "最后修改" },
+          { key: "path", label: "路径" },
+          { key: "actions", label: "" },
+        ]}
+        headCheckbox={
+          <input
+            ref={headerRef}
+            aria-busy={selectBusy || undefined}
+            type="checkbox"
+            disabled={loading || selectBusy || !items.length}
+            aria-label="全选当前筛选下可清理文件；已全选时清空全部选择"
+            aria-checked={headerIndeterminate ? "mixed" : allVisible && someVisible}
+            checked={allVisible && someVisible}
+            onChange={onHeaderToggle}
+            title="全选当前筛选全部；再次点击清空全部选择"
+          />
+        }
+        skeleton={
+          <div className="file-skeleton">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="skeleton file-skel-row" />
+            ))}
+          </div>
+        }
+        empty={
+          <div className="empty-row">
+            {activeFiltersCount > 0 ? "没有匹配的文件，试试清除筛选条件" : "该盘符暂无文件记录，请先完成扫描"}
+          </div>
+        }
+        renderRow={(rec, absoluteIndex) => {
           const locked = rec.is_locked === 1;
           const isSelected = selected.has(rec.path);
           const isLarge = rec.size >= largeBytes;
@@ -381,7 +402,7 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
             isSelected ? "row-selected" : "",
           ].join(" ");
           return (
-            <div className={rowClass} role="row" aria-rowindex={startIdx + rowIndex + 2} key={rec.id} style={{ height: ROW }}>
+            <div className={rowClass} role="row" aria-rowindex={absoluteIndex + 2} style={{ height: ROW }}>
               <span role="cell" className="col-check">
                 <input type="checkbox" aria-label={(locked ? "系统保护，无法选择：" : "选择文件：") + baseName(rec.path)} checked={isSelected} disabled={locked} onChange={(e) => setSelected(rec.path, e.target.checked)} />
               </span>
@@ -440,25 +461,8 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
               </span>
             </div>
           );
-        })}
-        <div style={{ height: Math.max(0, items.length * ROW - offsetY - slice.length * ROW) }} />
-        {loading && items.length === 0 && (
-          <div className="file-skeleton">
-            {[0, 1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="skeleton file-skel-row" />
-            ))}
-          </div>
-        )}
-        {loading && items.length > 0 && <div className="loading-row">正在加载更多…</div>}
-        {!loading && !loadError && items.length === 0 && (
-          <div className="empty-row">
-            {activeFiltersCount > 0 ? "没有匹配的文件，试试清除筛选条件" : "该盘符暂无文件记录，请先完成扫描"}
-          </div>
-        )}
-      </div>
-
-      </div>
-      {loadError && <div className="notice error" role="alert">文件列表读取失败：{loadError}<button type="button" className="btn small" onClick={() => void load(lastQuery.current.page, lastQuery.current.append)}>重试读取</button></div>}
+        }}
+      />
 
       <div className="file-bottom-bar">
         <span className="fbb-summary">

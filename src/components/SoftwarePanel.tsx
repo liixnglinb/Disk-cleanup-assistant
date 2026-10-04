@@ -47,6 +47,9 @@ export default function SoftwarePanel() {
   const [residueFor, setResidueFor] = useState<string | null>(null);
   const [residueResult, setResidueResult] = useState<ResidueResult | null>(null);
   const [residueBusy, setResidueBusy] = useState(false);
+  // 手风琴：同一时刻只展开一张卡。手风琴的语义就是互斥，
+  // 同时开两张会让每张卡都变高，一屏能看的软件数反而变少。
+  const [openCard, setOpenCard] = useState<string | null>(null);
 
   const toast = useToast();
   const loadedIcons = useRef<Set<string>>(new Set());
@@ -99,8 +102,21 @@ export default function SoftwarePanel() {
     return [...arr].sort((a, b) => mul * ((a.installed_size_mb ?? 0) - (b.installed_size_mb ?? 0)));
   }, [items, drive, idleOnly, keyword, sortOrder]);
 
+  const closeResidue = () => {
+    setResidueResult(null);
+    setResidueFor(null);
+  };
+
   const askUninstall = (it: SoftwareItem) => {
     if (it.uninstall_string) setUninstallTarget(it);
+  };
+
+  const toggleCard = (name: string) => {
+    const willOpen = openCard !== name;
+    setOpenCard(willOpen ? name : null);
+    // 收起时清掉残留结果：下次展开应回到"未扫描"状态，
+    // 否则用户会看到上一次的残留、误以为这是刚扫出来的。
+    if (!willOpen && residueFor === name) closeResidue();
   };
 
   const doUninstall = async () => {
@@ -138,11 +154,6 @@ export default function SoftwarePanel() {
     } finally {
       setResidueBusy(false);
     }
-  };
-
-  const closeResidue = () => {
-    setResidueResult(null);
-    setResidueFor(null);
   };
 
   const idleCount = items.filter(isIdle).length;
@@ -209,73 +220,108 @@ export default function SoftwarePanel() {
           const idle = isIdle(it);
           const iconUrl = icons[it.name];
           const isResidue = residueFor === it.name && residueResult;
+          const open = openCard === it.name;
           return (
-            <div className={`sw-card ${idle ? "idle" : ""}`} key={it.name + it.install_location}>
+            <div className={`sw-card ${idle ? "idle" : ""} ${open ? "open" : ""}`} key={it.name + it.install_location}>
+              {/* 顶部 1px 高光线：取软件图标的主色调。
+                  api.softwareIcon 只返回 base64 PNG，取不到主色，退回按名称哈希的稳定色 ——
+                  同一软件每次渲染颜色一致，用户能靠颜色分区扫读。 */}
+              <span className="sw-card-accent" style={{ background: icons[it.name] ? undefined : avatarColor(it.name || "?") }} aria-hidden="true" />
               {idle && <span className="badge badge-caution sw-idle-badge">闲置</span>}
-              <div className="sw-card-head">
-                {iconUrl ? (
-                  <img className="sw-icon-img" src={iconUrl} alt="" />
-                ) : (
-                  <div className="sw-icon" style={{ background: avatarColor(it.name || "?") }}>
-                    {(it.name || "?").trim().charAt(0).toUpperCase()}
+              {/* 整卡可点开：手风琴。按钮元素包住整卡，键盘可达性由它承担；
+                  卡内的次级操作通过 stopPropagation 阻止冒泡，避免误触发展开。 */}
+              <button
+                className="sw-card-toggle"
+                onClick={() => toggleCard(it.name)}
+                aria-expanded={open}
+                aria-controls={`sw-residue-${encodeURIComponent(it.name)}`}
+              >
+                <div className="sw-card-head">
+                  {iconUrl ? (
+                    <img className="sw-icon-img" src={iconUrl} alt="" />
+                  ) : (
+                    <div className="sw-icon" style={{ background: avatarColor(it.name || "?") }}>
+                      {(it.name || "?").trim().charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="sw-card-head-text">
+                    <div className="sw-name" title={it.name}>{it.name}</div>
+                    <div className="sw-pub">{it.publisher || "未知发布者"}</div>
                   </div>
-                )}
-                <div className="sw-card-head-text">
-                  <div className="sw-name" title={it.name}>{it.name}</div>
-                  <div className="sw-pub">{it.publisher || "未知发布者"}</div>
+                  <span className="sw-drive-badge" title={`安装位置：${it.install_location || "未知"}`}>
+                    {it.drive || "C:"}
+                  </span>
+                  <span className="sw-caret" aria-hidden="true">
+                    <Icon name="chevron-right" size={14} />
+                  </span>
                 </div>
-                <span className="sw-drive-badge" title={`安装位置：${it.install_location || "未知"}`}>
-                  {it.drive || "C:"}
-                </span>
-              </div>
-              <div className="sw-meta">
-                <span>大小 {it.installed_size_mb != null ? `${it.installed_size_mb} MB` : "未知"}</span>
-                <span>安装 {it.install_date || "未知"}</span>
-              </div>
-              {it.install_location && (
-                <div className="sw-location" title={it.install_location}>{it.install_location}</div>
-              )}
-              <div className="sw-actions">
-                {it.uninstall_string ? (
-                  <>
-                    <button
-                      className="btn small danger"
-                      onClick={() => askUninstall(it)}
-                      disabled={uninstalling === it.name}
-                    >
-                      {uninstalling === it.name ? "启动中…" : "卸载"}
-                    </button>
-                    <button
-                      className="btn small"
-                      onClick={() => doResidue(it)}
-                      disabled={residueBusy}
-                    >
-                      扫描残留
-                    </button>
-                  </>
-                ) : (
-                  <span className="dim" style={{ fontSize: 12 }}>无卸载入口</span>
+                <div className="sw-meta">
+                  <span>大小 {it.installed_size_mb != null ? `${it.installed_size_mb} MB` : "未知"}</span>
+                  <span>安装 {it.install_date || "未知"}</span>
+                </div>
+                {it.install_location && (
+                  <div className="sw-location" title={it.install_location}>{it.install_location}</div>
                 )}
-              </div>
+              </button>
 
-              {isResidue && (
-                <div className="sw-residue">
-                  <div className="sw-residue-head">
-                    <span>残留（{residueResult!.count} 处 · 共 {formatBytes(residueResult!.total_bytes)}）</span>
-                    <button className="sw-search-clear" onClick={closeResidue}><Icon name="x" size={13} /></button>
-                  </div>
-                  <div className="sw-residue-list">
-                    {residueResult!.items.length === 0 && <div className="dim">未发现残留</div>}
-                    {residueResult!.items.map((r) => (
-                      <div className="sw-residue-item" key={r.path} title={r.path}>
-                        <Icon name={r.is_dir ? "archive" : "file"} size={12} />
-                        <span className="sw-residue-path">{r.path}</span>
-                        <span className="sw-residue-size">{formatBytes(r.size)}</span>
+              {/* 展开区：手风琴式原地下沉。grid-template-rows 0fr→1fr 的过渡
+                  比 max-height 更省 —— 不需要猜内容高度，内容再长也平滑。 */}
+              <div className="sw-collapse" id={`sw-residue-${encodeURIComponent(it.name)}`} aria-hidden={!open}>
+                <div className="sw-collapse-inner">
+                  <div className="sw-accordion-body">
+                    {isResidue ? (
+                      <>
+                        <div className="sw-residue-head">
+                          <span>残留（{residueResult!.count} 处 · 共 {formatBytes(residueResult!.total_bytes)}）</span>
+                          <button className="sw-search-clear" onClick={closeResidue} aria-label="关闭残留"><Icon name="x" size={13} /></button>
+                        </div>
+                        {residueBusy ? (
+                          <div className="dim" style={{ fontSize: "var(--fs-sm)" }}>正在扫描残留…</div>
+                        ) : residueResult!.items.length === 0 ? (
+                          <div className="dim">未发现残留</div>
+                        ) : (
+                          <div className="sw-residue-list">
+                            {residueResult!.items.map((r) => (
+                              <div className="sw-residue-item" key={r.path} title={r.path}>
+                                <Icon name={r.is_dir ? "archive" : "file"} size={12} />
+                                <span className="sw-residue-path">{r.path}</span>
+                                <span className="sw-residue-size">{formatBytes(r.size)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="sw-accordion-hint dim">
+                        展开后可扫描卸载残留，或直接启动官方卸载程序。
                       </div>
-                    ))}
+                    )}
+                  </div>
+                  {/* 展开后才浮现的操作区：默认隐藏，避免每张卡都挂两个按钮。 */}
+                  <div className="sw-accordion-actions">
+                    {it.uninstall_string ? (
+                      <>
+                        <button
+                          className="btn small danger"
+                          onClick={(e) => { e.stopPropagation(); askUninstall(it); }}
+                          disabled={uninstalling === it.name}
+                        >
+                          {uninstalling === it.name ? "启动中…" : "一键卸载"}
+                        </button>
+                        <button
+                          className="btn small"
+                          onClick={(e) => { e.stopPropagation(); doResidue(it); }}
+                          disabled={residueBusy}
+                        >
+                          {residueBusy ? "扫描中…" : "扫描残留"}
+                        </button>
+                      </>
+                    ) : (
+                      <span className="dim" style={{ fontSize: "var(--fs-sm)" }}>该软件未提供卸载入口</span>
+                    )}
                   </div>
                 </div>
-              )}
+              </div>
             </div>
           );
         })}

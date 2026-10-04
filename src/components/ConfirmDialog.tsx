@@ -147,7 +147,7 @@ export default function ConfirmDialog({
 
   return (
     <div className="modal-mask" onClick={close}>
-      <div className="modal" ref={modalRef} role="alertdialog" aria-modal="true" aria-label="确认清理文件" aria-busy={busy} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
+      <div className="modal is-danger" ref={modalRef} role="alertdialog" aria-modal="true" aria-label="确认清理文件" aria-busy={busy} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
         <div className="modal-icon warn-icon"><Icon name="alert" size={22} /></div>
         <h3>确认删除 {paths.length} 个文件？</h3>
         <p className="modal-desc">

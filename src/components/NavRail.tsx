@@ -2,6 +2,11 @@ import React from "react";
 import Icon from "./icons";
 import { SECTIONS, useWorkspace } from "../store/workspace";
 
+/**
+ * 48px 极简图标导航（方案二要求）。
+ * 标签不常驻：靠 CSS 的 ::after + data-label 在悬停/聚焦时浮出 tooltip，
+ * 避免 48px 宽度下文字换行或截断。
+ */
 export default function NavRail() {
   const { section, setSection } = useWorkspace();
   return (
@@ -11,14 +16,12 @@ export default function NavRail() {
           key={s.key}
           className={`rail-item ${section === s.key ? "active" : ""}`}
           onClick={() => setSection(s.key)}
+          data-label={s.label}
           title={s.label}
           aria-current={section === s.key ? "page" : undefined}
         >
           <Icon name={s.icon} size={20} />
-          <span className="rail-text">
-            <span className="rail-label">{s.label}</span>
-            <span className="rail-desc">{s.desc}</span>
-          </span>
+          <span className="sr-only">{s.label}</span>
         </button>
       ))}
     </nav>
