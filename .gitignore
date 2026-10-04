@@ -46,3 +46,9 @@ Thumbs.db
 # 根目录四位数以上的纯数字文件名都是它写的 stderr 转储（含 viz_main_impl / crashpad 报错），
 # 不是源码也不是数据；根治要在启动器里设 ELECTRON_LOG_FILE 指到日志目录。
 /[0-9][0-9][0-9][0-9]*
+
+# ---- 本地产物与取证（2026-10-04）----
+/_archive/        # 306MB 构建产物与 pytest 缓存的本地存档
+/shots/           # UI 取证截图（网站侧与本站都不引用，仅本地留档）
+/shots3/
+/settings-*.png
