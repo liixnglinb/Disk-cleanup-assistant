@@ -532,7 +532,7 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
 .modal.is-center .modal-icon { width: 44px; height: 44px; margin-bottom: 14px; }
 .modal .modal-icon.primary-icon { background: var(--primary-soft); color: var(--primary); }
 .modal.is-center h3 { font-size: var(--fs-xl); letter-spacing: -0.01em; }
-.modal.is-center .modal-desc { margin-bottom: 16px; }
+.modal.is-center .modal-desc { margin-bottom: 16px; white-space: pre-line; }
 .modal.is-center .modal-actions { padding-bottom: 24px; }
 .modal.is-center .modal-actions .btn { min-width: 104px; }
 /* ===== 表格 ===== */
@@ -991,7 +991,11 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
   max-height: 12em; overflow: auto; white-space: pre-wrap;
   font-size: var(--fs-sm); color: var(--text-body);
 }
-.update-panel-foot { margin-top: var(--space-3); font-size: var(--fs-xs); color: var(--text-muted); }
+.update-panel-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: var(--space-3); font-size: var(--fs-xs); color: var(--text-muted);
+}
+.update-panel-status { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 窄窗口：胶囊贴边距收窄，面板占满可用宽度 */
 @media (max-width: 520px) {
   .update-capsule { right: 12px; bottom: 12px; }

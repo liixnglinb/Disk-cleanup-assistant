@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { FEEDS, parseLatestYml, rankFeeds } from "./feeds.js";
+import { FEEDS, parseLatestYml, rankFeeds, releaseNotesToPlainText } from "./feeds.js";
 
 const YML = [
   "version: 0.3.0",
@@ -66,4 +66,40 @@ test("rankFeeds 全失败时回退原顺序（= FEEDS 顺序）", () => {
   assert.deepEqual(r.ranked, FEEDS.map((f) => f.url));
   assert.equal(r.fastest, null);
   assert.equal(r.measured, 0);
+});
+
+// ---- releaseNotesToPlainText：应用内面板是纯文本容器，markdown 标记会原样露出 ----
+
+test("去掉标题井号、加粗与行内代码标记", () => {
+  const out = releaseNotesToPlainText("## 标题\n\n**加粗词**：改为 `rgba(0,0,0,0)` 底色");
+  assert.equal(out, "标题\n\n加粗词：改为 rgba(0,0,0,0) 底色");
+});
+
+test("列表符号转 · ，链接只留锚文本", () => {
+  const out = releaseNotesToPlainText("- 第一项\n* 第二项\n\n详见 [发布页](https://example.com/a)");
+  assert.equal(out, "· 第一项\n· 第二项\n\n详见 发布页");
+});
+
+test("丢掉 GitHub 自动追加的 Full Changelog 行", () => {
+  const out = releaseNotesToPlainText("真实说明\n\n**Full Changelog**: https://github.com/a/b/compare/v1...v2");
+  assert.equal(out, "真实说明");
+});
+
+test("连续空行压成一个，首尾空白去掉", () => {
+  assert.equal(releaseNotesToPlainText("\n\n第一段\n\n\n\n第二段\n\n  "), "第一段\n\n第二段");
+});
+
+test("超长时按行边界截断并加省略号", () => {
+  const src = ["甲", "乙", "丙"].map((s) => s + " ".repeat(600)).join("\n");
+  const out = releaseNotesToPlainText(src, 1200);
+  assert.ok(out.endsWith("…"), "应以省略号结尾");
+  assert.ok(out.length <= 1200, "不应超过上限");
+  assert.ok(!out.includes("丙"), "第三段应被整段截掉，不从行中间切");
+});
+
+test("空值与非字符串返回空串", () => {
+  assert.equal(releaseNotesToPlainText(""), "");
+  assert.equal(releaseNotesToPlainText("   \n "), "");
+  assert.equal(releaseNotesToPlainText(undefined), "");
+  assert.equal(releaseNotesToPlainText(null), "");
 });

@@ -36,4 +36,30 @@ function rankFeeds(probes, { minBytes = 1 } = {}) {
   return { ranked: [...bySpeed, ...rest], fastest: bySpeed[0] ?? null, measured: measured.length };
 }
 
-module.exports = { FEEDS, parseLatestYml, rankFeeds };
+/**
+ * GitHub Release 正文是 markdown，而应用内的更新面板是 `white-space: pre-wrap`
+ * 的纯文本容器 —— 直接塞进去会露出 ## / ** / ` 这些标记（实测原样显示）。
+ * 这里做一次单向降级：去标记、列表符号转「·」、链接只留锚文本、
+ * 丢掉 GitHub 自动追加的 Full Changelog 行、按行边界截断。
+ */
+function releaseNotesToPlainText(md, maxChars = 1200) {
+  if (typeof md !== "string" || !md.trim()) return "";
+  const t = md
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .filter((line) => !/^\s*\**\s*Full Changelog\s*\**\s*:?\s*https?:\/\//i.test(line))
+    .join("\n")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/`{1,3}([^`]*)`{1,3}/g, "$1")
+    .replace(/\[([^\]]+)\]\(([^)]*)\)/g, "$1")
+    .replace(/^\s*[-*+]\s+/gm, "· ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  if (t.length <= maxChars) return t;
+  const cut = t.slice(0, maxChars);
+  const nl = cut.lastIndexOf("\n");
+  return (nl > maxChars * 0.5 ? cut.slice(0, nl) : cut).replace(/[\s·-]+$/, "") + "…";
+}
+
+module.exports = { FEEDS, parseLatestYml, rankFeeds, releaseNotesToPlainText };

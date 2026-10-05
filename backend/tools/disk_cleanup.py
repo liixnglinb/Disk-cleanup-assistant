@@ -14,7 +14,7 @@ from ..api import (
 )
 from ..platform import ToolSpec
 
-__version__ = "0.5.3"
+__version__ = "0.5.4"
 
 
 def _router() -> APIRouter:

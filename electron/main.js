@@ -3,7 +3,8 @@ const crypto = require("crypto");
 const path = require("path");
 const { autoUpdater } = require("electron-updater");
 const { startBackend } = require("./backend_runner");
-const { rankFeedsBySpeed } = require("./update_probe");
+const { rankFeedsBySpeed, getText } = require("./update_probe");
+const { releaseNotesToPlainText } = require("./feeds");
 
 // 自定义协议：网页可通过 local-toolbox:// 唤起本软件
 const PROTOCOL = "local-toolbox";
@@ -97,6 +98,37 @@ function versionGt(a, b) {
   return false;
 }
 
+// 更新说明的唯一来源是 GitHub Release 正文：electron-builder 写进 latest.yml 的
+// 只有 version/files/path/sha512/releaseDate，generic provider 解析出来的 updateInfo
+// 因此永远没有 releaseNotes —— 不自己取，应用内就只会显示"本次发布未提供更新说明"。
+const RELEASE_API = "https://api.github.com/repos/liixnglinb/Disk-cleanup-assistant/releases/";
+let notesCache = { tag: "", text: "" };
+
+/** 取该版本的 Release 正文并降级为纯文本；取不到返回空串，绝不阻塞更新流程。 */
+async function resolveReleaseNotes(version) {
+  const tag = "v" + String(version || "").replace(/^v/, "");
+  if (tag === "v") return "";
+  if (notesCache.tag === tag) return notesCache.text;
+  let text = "";
+  try {
+    const r = await getText(RELEASE_API + tag, { timeoutMs: 4000 });
+    if (r && r.ok && r.text) {
+      text = releaseNotesToPlainText(JSON.parse(r.text).body);
+    }
+  } catch {
+    text = ""; // 网络失败/限流/JSON 异常都退回"未提供更新说明"，不能因此卡住检查
+  }
+  notesCache = { tag, text };
+  return text;
+}
+
+/** 优先用 updateInfo 自带的 releaseNotes（GitHub provider 会有），否则回读 Release 正文。 */
+async function notesFor(info, version) {
+  const own = typeof info.releaseNotes === "string" ? info.releaseNotes.trim() : "";
+  if (own) return releaseNotesToPlainText(own);
+  return resolveReleaseNotes(version);
+}
+
 // 测速缓存：同一会话内 10 分钟不重复测（避免每次检查都跑 3 次采样）
 let speedCache = { at: 0, ranked: null, log: [] };
 const SPEED_TTL = 10 * 60 * 1000;
@@ -137,7 +169,7 @@ function scheduleStartupCheck() {
       const latest = String(info.version || "").replace(/^v/, "");
       if (!versionGt(latest, app.getVersion())) return;
 
-      const notes = typeof info.releaseNotes === "string" ? info.releaseNotes : "";
+      const notes = await notesFor(info, latest);
       const payload = {
         latest,
         current: app.getVersion(),
@@ -149,7 +181,8 @@ function scheduleStartupCheck() {
       if (Notification.isSupported()) {
         new Notification({
           title: "磁盘清理助手有新版本",
-          body: `v${latest} 已发布，正在后台下载；下载完成后点击标题栏的更新方块即可安装并重启。`,
+          // 更新入口自 v0.5.0 起从标题栏搬到右下角胶囊，文案别再指回标题栏
+          body: `v${latest} 已发布，正在后台下载；下载完成后点击右下角的「更新」胶囊即可安装并重启。`,
         }).show();
       }
     } catch {
@@ -167,7 +200,7 @@ ipcMain.handle("update:check", async () => {
   if (!r.ok) return { ok: false, error: r.error };
   const info = r.result.updateInfo;
   const latest = String(info.version || "").replace(/^v/, "");
-  const notes = typeof info.releaseNotes === "string" ? info.releaseNotes : "";
+  const notes = await notesFor(info, latest);
   return {
     ok: true,
     current,
