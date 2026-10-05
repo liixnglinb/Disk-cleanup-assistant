@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 
 from ..platform import ToolSpec
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 
 router = APIRouter(prefix="/api/<your_tool_id>", tags=["<your_tool_id>"])
 

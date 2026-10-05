@@ -32,7 +32,8 @@ try {
   const seq = (process.env.SECTION_SEQ || "设置").split(",");
   for (const name of seq) {
     try {
-      await win.locator(`nav[aria-label="主导航"] button[title="${name}"]`).click({ timeout: 15000 });
+      // 标签常驻后按钮不再有 title 属性，按可见文本定位
+      await win.locator(`nav[aria-label="主导航"] button:has-text("${name}")`).click({ timeout: 15000 });
       errors.push(`[click-ok] ${name}`);
       await win.waitForTimeout(2500);
     } catch (e) {

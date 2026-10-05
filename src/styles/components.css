@@ -50,53 +50,33 @@
   transition: width 0.3s var(--ease-out);
 }
 
-/* ---------------- 左侧导航栏（48px 纯图标） ---------------- */
+/* ---------------- 左侧导航栏（图标 + 常驻文字标签） ---------------- */
 .nav-rail {
   width: var(--nav-rail-w); flex: none;
-  display: flex; flex-direction: column; align-items: center;
-  gap: 2px; padding: var(--space-3) 0;
+  display: flex; flex-direction: column;
+  gap: 4px; padding: var(--space-3) 8px;
   background: var(--bg);
   border-right: 1px solid var(--border);
 }
-/* 方案二要求 48px 极简图标导航：去掉文字标签与描述，改用 title 提示。
-   保留 .rail-text 规则是为了不破坏仍可能渲染它的旧节点，实际不消费。 */
 .rail-item {
   position: relative;
-  width: 36px; height: 36px; border: 0; border-radius: var(--radius-sm);
+  width: 100%; height: 36px; border: 0; border-radius: var(--radius-sm);
   background: transparent; color: var(--text-muted); cursor: pointer;
-  display: inline-flex; align-items: center; justify-content: center;
-  padding: 0;
+  display: flex; align-items: center; gap: 10px; padding: 0 12px;
+  font-family: var(--font-ui); font-size: var(--fs-md); font-weight: var(--fw-medium);
+  white-space: nowrap; text-align: left;
   transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
-.rail-item .rail-text { display: none; }
-.rail-item .rail-label { font-size: var(--fs-base); font-weight: var(--fw-medium); }
-.rail-item .rail-desc { display: none; }
+.rail-item > svg { flex: none; }
 .rail-item:hover { background: var(--surface-hover); color: var(--text); }
-/* 激活态：底色 + 左侧 2px 指示条。
+/* 激活态：底色 + 左侧 2px 指示条 + 加粗标签。
    用 inset box-shadow 而不是 ::before 伪元素：伪元素会被按钮的 border-radius
    裁切，且要额外处理 top/transform 对齐；阴影不参与布局也不会被圆角切掉。 */
 .rail-item.active {
   background: var(--primary-soft); color: var(--primary);
+  font-weight: var(--fw-semibold);
   box-shadow: inset 2px 0 0 var(--primary);
 }
-
-/* 导航 tooltip：48px 纯图标下唯一的标签载体。
-   用 data-label 而非 title——原生 title 有系统级延迟，且无法样式化。 */
-.rail-item { position: relative; }
-.rail-item::after {
-  content: attr(data-label);
-  position: absolute; left: calc(100% + 10px); top: 50%;
-  transform: translateY(-50%) scale(0.94);
-  padding: 4px 8px; border-radius: var(--radius-sm);
-  background: var(--surface); color: var(--text);
-  border: 1px solid var(--border); box-shadow: var(--shadow);
-  font-size: var(--fs-sm); font-weight: var(--fw-medium);
-  white-space: nowrap; pointer-events: none;
-  opacity: 0; transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
-  z-index: 120;
-}
-.rail-item:hover::after,
-.rail-item:focus-visible::after { opacity: 1; transform: translateY(-50%) scale(1); }
 
 .workspace { flex: 1; display: flex; min-height: 0; position: relative; }
 
@@ -499,7 +479,8 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
 .empty { text-align: center; padding: 28px; color: var(--text-muted); font-size: var(--fs-base); }
 
 /* ===== 设置页（单栏全展开：内层侧栏已移除，不再有"两层导航 + 窄卡片浮在留白里"） ===== */
-.settings-body { max-width: 880px; }
+/* 880px 上限保行长可读；一生效面板就贴在左侧，用 auto 外边距把它摆回中间。 */
+.settings-body { width: 100%; max-width: 880px; margin-inline: auto; }
 /* 分组之间用一条分隔线拉开，而不是再套一层导航 */
 .settings-body .setting-section-title:not(:first-child) {
   margin-top: 26px; padding-top: 22px; border-top: 1px solid var(--border);
@@ -825,7 +806,7 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
   .file-bottom-bar .fbb-summary { flex-basis: 100%; }
   .file-panel .notice.error { align-items: stretch; flex-direction: column; }
 }
-/* 窄窗口：48px 图标导航已是下限，仅收紧内容留白 */
+/* 窄窗口：导航栏 120px 已是可用下限，只收紧内容留白 */
 @media (max-width: 959px) { :root { --content-pad: 16px; } }
 
 /* 文件列表选中态加左侧强调条，视觉更明确 */
