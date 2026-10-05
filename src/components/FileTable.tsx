@@ -10,7 +10,9 @@ import { useToast } from "../store/ToastContext";
 import { useSettings } from "../store/settings";
 
 const ROW = 44;
-const PAGE = 500;
+/* 一页 100 行 = 4,400px 滚动高。此前是 500（22,000px）且触底只追加不清空，
+   真扫整盘时列表越滚越长、永远滚不到头，故改为定长分页窗口。 */
+const PAGE = 100;
 
 /**
  * 行内状态一律"图标着色 + 中性文字"，彩色胶囊只留给聚合计数。
@@ -55,11 +57,10 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const requestVersion = useRef(0);
-  const lastQuery = useRef({ page: 0, append: false });
   const [confirmOpen, setConfirmOpen] = useState(false);
   // 虚拟滚动的位置状态已移入 DataTable；这里只保留"重置滚动"的触发信号：
-  // 筛选/盘符变化后列表要回到顶部，否则用户会停在新筛选结果的中间位置。
-  const resetScrollKey = `${scanId}|${category}|${sort}|${keyword}|${recommendation}|${largeOnly}|${needsAiOnly}`;
+  // 筛选/盘符/翻页后列表要回到顶部，否则用户会停在新结果的中间位置。
+  const resetScrollKey = `${scanId}|${page}|${category}|${sort}|${keyword}|${recommendation}|${largeOnly}|${needsAiOnly}`;
   const toast = useToast();
   // 设置：大文件阈值 / 自动预览 / 已 AI 分析标记（会话内避免重复标“存疑”）
   const settings = useSettings();
@@ -95,16 +96,16 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
   useEffect(() => {
     const prev = prevStatusRef.current;
     prevStatusRef.current = st;
-    if (prev === "running" && st === "completed" && scanId) load(0, false);
+    if (prev === "running" && st === "completed" && scanId) load(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [st, scanId]);
 
-  const load = useCallback(async (pageToLoad: number, append: boolean) => {
+  const load = useCallback(async (pageToLoad: number) => {
     if (!scanId) return;
     const version = ++requestVersion.current;
-    lastQuery.current = { page: pageToLoad, append };
     setLoading(true);
     setLoadError(null);
+    setPage(pageToLoad);
     try {
       const r = await api.queryFiles({
         scan_id: scanId,
@@ -118,22 +119,44 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
         page_size: PAGE,
       });
       if (version !== requestVersion.current) return;
-      if (append) setItems((p) => [...p, ...r.items]);
-      else setItems(r.items);
+      // 分页窗口是「替换」而不是「累加」：items 恒为一页，滚动高度恒定。
+      setItems(r.items);
       setTotal(r.total);
-      setPage(pageToLoad);
     } catch (e) {
       if (version === requestVersion.current) setLoadError(e instanceof Error ? e.message : String(e));
     } finally {
       if (version === requestVersion.current) setLoading(false);
     }
-  }, [scanId, category, keyword, sort, recommendation, largeOnly, needsAiOnly]);
+  }, [scanId, category, keyword, sort, recommendation, largeOnly, needsAiOnly, largeBytes]);
 
   useEffect(() => {
     setItems([]);
     setTotal(0);
-    if (scanId) load(0, false);
+    if (scanId) load(0);
   }, [scanId, category, sort, keyword, recommendation, largeOnly, needsAiOnly, load]);
+
+  // 分页窗口：总页数由服务端返回的 total 决定，翻页是替换当前页。
+  const pageCount = Math.max(1, Math.ceil(total / PAGE));
+  const goTo = useCallback((target: number) => {
+    const next = Math.min(Math.max(target, 0), pageCount - 1);
+    if (next === page || loading) return;
+    load(next);
+  }, [page, pageCount, loading, load]);
+
+  // 左右方向键翻页。必须排掉输入控件与弹窗：
+  // 搜索框里按方向键是移光标，确认框打开时也不该被背后的列表抢走。
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+      if (document.querySelector('[role="dialog"]')) return;
+      if (pageCount < 2) return;
+      goTo(e.key === "ArrowLeft" ? page - 1 : page + 1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [goTo, page, pageCount]);
 
   // 单文件 AI 分析（C 类）
   const analyzeSingle = async (rec: FileRecord) => {
@@ -325,7 +348,7 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
             <Icon name="info" size={13} /> {aiBusy ? "AI 分析中…" : `AI 分析存疑文件`}
             {needsAiCount > 0 && <span className="badge badge-warn ai-count-badge">{needsAiCount}</span>}
           </button>
-          <button className="btn small" onClick={() => load(0, false)} disabled={loading}>刷新</button>
+          <button className="btn small" onClick={() => load(page)} disabled={loading}>刷新</button>
           {activeFiltersCount > 0 && (
             <button className="btn small ghost" onClick={() => { setCategory(""); setRecommendation(""); setLargeOnly(false); setNeedsAiOnly(false); setKeyword(""); }}>
               清除筛选
@@ -345,9 +368,6 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
         totalCount={total}
         loading={loading}
         resetKey={resetScrollKey}
-        onReachEnd={() => {
-          if (items.length < total && !loading) load(page + 1, true);
-        }}
         columns={[
           { key: "name", label: "文件" },
           { key: "size", label: "大小" },
@@ -464,9 +484,22 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
         }}
       />
 
+      <div className="list-pager">
+        <button className="btn small" onClick={() => goTo(page - 1)} disabled={loading || page <= 0}>
+          <Icon name="chevron-left" size={13} /> 上一页
+        </button>
+        <span className="pager-pos" aria-live="polite">
+          {total ? `第 ${page + 1} / ${pageCount} 页` : "无匹配文件"} · 本页 {items.length} 条 · 共 {total.toLocaleString()} 条
+          {pageCount > 1 && <span className="pager-hint">（← → 键翻页）</span>}
+        </span>
+        <button className="btn small" onClick={() => goTo(page + 1)} disabled={loading || page >= pageCount - 1}>
+          下一页 <Icon name="chevron-right" size={13} />
+        </button>
+      </div>
+
       <div className="file-bottom-bar">
         <span className="fbb-summary">
-          已选 <b>{selectedCount}</b> 个 · {loadedSelected === selectedCount ? "合计" : "已加载 " + loadedSelected + " 项大小"} <b>{formatBytes(selectedBytes)}</b>{loadedSelected !== selectedCount && <span className="selection-note">其余选项大小未读取；确认框列出全部路径。</span>}
+          已选 <b>{selectedCount}</b> 个 · {loadedSelected === selectedCount ? "合计" : "本页 " + loadedSelected + " 项大小"} <b>{formatBytes(selectedBytes)}</b>{loadedSelected !== selectedCount && <span className="selection-note">其余选项大小未读取；确认框列出全部路径。</span>}
         </span>
         <span className="muted" style={{ fontSize: 12 }}>筛选共 {total.toLocaleString()} 个 · 系统文件已自动排除</span>
         <div className="fbb-spacer" />
@@ -483,7 +516,7 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
         onDone={async () => {
           clearSelection();
           await refreshStatistics();
-          await load(0, false);
+          await load(page);
         }}
       />
     </div>

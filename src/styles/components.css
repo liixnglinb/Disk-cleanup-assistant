@@ -381,6 +381,16 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
 .rf-err { color: var(--danger); min-width: 0; word-break: break-all; }
 .modal .modal-icon.ok-icon { background: var(--ok-soft); color: var(--ok); }
 
+/* 分页条：定长分页窗口的唯一导航位。
+   此前这里是「触底自动追加」，每页 500 行会把 spacer 撑到 22,000px 且只增不减，
+   整盘扫描时永远滚不到头 —— 见 FileTable.tsx 的 PAGE 注释。 */
+.list-pager {
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  padding: 10px 16px; border-top: 1px solid var(--border); background: var(--bg);
+}
+.pager-pos { font-size: var(--fs-base); color: var(--text-body); font-variant-numeric: tabular-nums; }
+.pager-hint { color: var(--text-dim); font-size: var(--fs-sm); }
+
 .file-bottom-bar {
   display: flex; align-items: center; gap: 14px; padding: 12px 16px;
   border-top: 1px solid var(--border); background: var(--bg);

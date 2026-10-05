@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 /**
  * 通用数据网格外壳（方案二阶段二）。
  *
- * 抽出来的理由：文件列表此前把「虚拟滚动 + Sticky 表头 + 触底分页」三件事写死在
+ * 抽出来的理由：文件列表此前把「虚拟滚动 + Sticky 表头」两件事写死在
  * FileTable.tsx 里，清理工作区的三个维度都要用到。这里只抽**与业务无关的网格
  * 机制**；列内容与行内容仍由调用方 render —— 缓存是「目录聚合」、重复是
  * 「组内单选保留」、文件是「平铺多选」，三者的行模型差异大于共同点，
@@ -11,8 +11,10 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
  *
  * 性能约束（240 万文件量级，改动时必须守住）：
  *   1. 只渲染可视区 ± OVERS 行，其余用上下两块 spacer 撑高度；
- *   2. 行高固定（rowHeight），可视行数可由 scrollTop 直接算出，无需测量 DOM；
- *   3. 触底节流用 ref 记账，避免连滚时重复请求同一页。
+ *   2. 行高固定（rowHeight），可视行数可由 scrollTop 直接算出，无需测量 DOM。
+ *
+ * 分页由调用方决定（FileTable 用定长分页窗口，items 只有一页），本组件不再
+ * 关心触底加载 —— 追加式无限滚动会让 spacer 高度随页数无限增长，用户滚不到头。
  */
 
 const OVERS = 8;
@@ -42,8 +44,6 @@ interface Props<T> {
   rowHeight?: number;
   /** 表头最左侧的勾选槽；不传则不渲染该列 */
   headCheckbox?: React.ReactNode;
-  /** 接近底部时触发（分页加载）；同一页只触发一次，由调用方在数据变化后允许再次触发 */
-  onReachEnd?: () => void;
   loading?: boolean;
   /** 首屏加载骨架 */
   skeleton?: React.ReactNode;
@@ -70,7 +70,6 @@ export default function DataTable<T>({
   variant,
   rowHeight = 44,
   headCheckbox,
-  onReachEnd,
   loading,
   skeleton,
   empty,
@@ -88,24 +87,10 @@ export default function DataTable<T>({
   useEffect(() => {
     if (headRef.current) setHeadH(headRef.current.offsetHeight);
   }, []);
-  // 触底节流：本页已触发过就不再重复回调，调用方 onReachEnd 内部也会按 page 去重
-  const endFiredRef = useRef(false);
-
   const onScroll = useCallback(() => {
     const el = bodyRef.current;
-    if (!el) return;
-    setScrollTop(el.scrollTop);
-    if (!onReachEnd || endFiredRef.current) return;
-    if (el.scrollTop + el.clientHeight >= el.scrollHeight - rowHeight * 4) {
-      endFiredRef.current = true;
-      onReachEnd();
-    }
-  }, [onReachEnd, rowHeight]);
-
-  // 加载结束后解锁，允许滚动触底加载下一页
-  useEffect(() => {
-    if (!loading) endFiredRef.current = false;
-  }, [loading]);
+    if (el) setScrollTop(el.scrollTop);
+  }, []);
 
   // 筛选变化 → 回到顶部。必须同步清 scrollTop，否则 spacer 高度与实际滚动位置不匹配。
   useEffect(() => {
