@@ -271,13 +271,13 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
     setConfirmOpen(true);
   };
 
-  // F1：表头全选（已全部选中→清空可视；否则全选当前筛选全部）
+  // F1：表头勾选只管本页 —— 勾选状态与勾选动作的口径必须一致，
+  // 否则出现"表头显示已勾满、实际只勾了本页"，用户根本看不出勾了谁。
+  // 跨页全选仍走工具栏「全选筛选结果」（后端按同一筛选返回全部 path）。
   const onHeaderToggle = () => {
-    if (allVisible) {
-      clearSelection();
-    } else {
-      selectAllFiltered();
-    }
+    const pagePaths = items.filter((r) => r.is_locked !== 1).map((r) => r.path);
+    if (!pagePaths.length) return;
+    setSelectedMany(pagePaths, !allVisible);
   };
 
   const selectedPaths = Array.from(selected);
@@ -286,11 +286,10 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
   const selectedCount = selected.size;
   const loadedSelected = items.filter((f) => selected.has(f.path)).length;
 
-  // F1：表头全选三态。
-  // 口径说明（有意偏离原实现）：原代码用 DataTable 之前的"可视切片 slice"算 allVisible，
-  // 但 slice 随滚动变化 —— 用户滚到中间点表头时，勾选态会随可视窗口抖动。
-  // 现改为对"已加载集合"求全选：分页是追加式加载，已加载集合就是当前可操作范围的上界，
-  // 勾选态在整个滚动过程中保持稳定。锁定（系统保护）行不参与，视为"天然已处理"。
+  // F1：表头勾选三态。口径 = 本页（items 就是一页，翻页是替换不是累加）。
+  // 原实现用"可视切片 slice"求全选，slice 随滚动变化 —— 滚到中间点表头时勾选态会抖动；
+  // v0.5.2 之前又用"已加载集合"，而那时是追加式加载，集合会一路膨胀到几千条，
+  // 于是出现"表头显示已勾满、其实只勾了滚过的部分"。锁定（系统保护）行不参与。
   const allVisible = items.length > 0 && items.every((r) => r.is_locked === 1 || selected.has(r.path));
   const someVisible = items.some((r) => selected.has(r.path));
   const headerIndeterminate = someVisible && !allVisible;
@@ -380,17 +379,20 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
           { key: "actions", label: "" },
         ]}
         headCheckbox={
-          <input
-            ref={headerRef}
-            aria-busy={selectBusy || undefined}
-            type="checkbox"
-            disabled={loading || selectBusy || !items.length}
-            aria-label="全选当前筛选下可清理文件；已全选时清空全部选择"
-            aria-checked={headerIndeterminate ? "mixed" : allVisible && someVisible}
-            checked={allVisible && someVisible}
-            onChange={onHeaderToggle}
-            title="全选当前筛选全部；再次点击清空全部选择"
-          />
+          <>
+            <input
+              ref={headerRef}
+              aria-busy={selectBusy || undefined}
+              type="checkbox"
+              disabled={loading || selectBusy || !items.length}
+              aria-label="勾选或取消勾选本页全部可清理文件（跨页请用工具栏的「全选筛选结果」）"
+              aria-checked={headerIndeterminate ? "mixed" : allVisible && someVisible}
+              checked={allVisible && someVisible}
+              onChange={onHeaderToggle}
+              title="勾选本页全部可清理文件；再次点击取消勾选本页"
+            />
+            <span className="check-scope">本页</span>
+          </>
         }
         skeleton={
           <div className="file-skeleton">

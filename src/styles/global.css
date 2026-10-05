@@ -141,7 +141,7 @@
   /* 密度基线：表格行 / 表头 / 输入控件 */
   --row-h: 24px;
   --head-h: 28px;
-  --field-h: 26px;
+  --field-h: 32px;
 
   /* ================= 材质（面板 = 色阶 + 顶部 1px 内高光） ================= */
   --panel-grad: linear-gradient(180deg, #FFFFFF 0%, var(--surface) 100%);

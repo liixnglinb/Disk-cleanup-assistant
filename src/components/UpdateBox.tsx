@@ -63,14 +63,15 @@ export default function UpdateBox() {
             aria-hidden="true"
           >
             <span className="update-capsule-ring-inner">
-              {ready ? <Icon name="check" size={13} /> : downloading ? <span className="num">{pct}</span> : <Icon name="refresh" size={13} />}
+              {ready ? <Icon name="check" size={15} /> : downloading ? <span className="num">{pct}</span> : <Icon name="refresh" size={15} />}
             </span>
           </span>
           <span className="update-capsule-text">
             <b>{ready ? "更新已就绪" : downloading ? `正在下载 ${pct}%` : `发现新版本 v${state.latest ?? ""}`}</b>
             {!ready && <em>点击查看更新说明</em>}
           </span>
-          {!ready && <span className="update-capsule-caret" aria-hidden="true"><Icon name={open ? "chevron-right" : "chevron-right"} size={13} /></span>}
+          {/* 朝向由 CSS 的 .update-capsule.open .update-capsule-caret 旋转，这里不需要分支 */}
+          {!ready && <span className="update-capsule-caret" aria-hidden="true"><Icon name="chevron-right" size={13} /></span>}
         </button>
 
         {/* 阅读面板：悬停/点击展开的 Release Notes。

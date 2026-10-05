@@ -65,12 +65,13 @@ export default function ConfirmDialog({
 
   if (!open) return null;
 
-  // 通用确认模式：只有 title/body/onConfirm，不渲染文件清单、永久删除与还原点提示
+  // 通用确认模式：只有 title/body/onConfirm，不渲染文件清单、永久删除与还原点提示。
+  // 走居中对话框（.is-center）—— 它不是危险操作，不该占用删除流程的贴底 Action Sheet。
   if (title) {
     return (
-      <div className="modal-mask" onClick={close}>
-        <div className="modal" ref={modalRef} role="alertdialog" aria-modal="true" aria-label={title} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
-          <div className="modal-icon"><Icon name="refresh" size={22} /></div>
+      <div className="modal-mask is-center" onClick={close}>
+        <div className="modal is-center" ref={modalRef} role="alertdialog" aria-modal="true" aria-label={title} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
+          <div className="modal-icon primary-icon"><Icon name="refresh" size={20} /></div>
           <h3>{title}</h3>
           {body && <p className="modal-desc">{body}</p>}
           <div className="modal-actions">
