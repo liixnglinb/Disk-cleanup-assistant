@@ -1,7 +1,3 @@
-export type Category = "system" | "download" | "cache" | "app_data" | "docs" | "residue" | "large" | "unknown";
-export type Recommendation = "recommend" | "caution" | "keep" | "system";
-export type RiskLevel = "low" | "medium" | "high";
-
 export interface DriveInfo {
   drive: string;
   label: string;

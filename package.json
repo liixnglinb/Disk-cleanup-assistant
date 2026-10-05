@@ -18,7 +18,6 @@
     "gen:dev-cert": "powershell -ExecutionPolicy Bypass -File scripts\\generate_dev_cert.ps1",
     "dist:azure": "npm run build:renderer && npm run build:backend && node scripts/prepare-azure-config.mjs && electron-builder --win nsis --config build/azure-config.json",
     "verify:azure-env": "node scripts/prepare-azure-config.mjs",
-    "test:backend": "cd backend && python -m pytest -q",
     "check:versions": "python scripts/check_versions.py"
   },
   "dependencies": {

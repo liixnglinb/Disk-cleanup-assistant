@@ -5,7 +5,6 @@ import type { SVGProps } from "react";
  * stroke 跟随 currentColor，粗细统一 1.75，圆角端点。
  */
 export type IconName =
-  | "home"
   | "disk"
   | "chart"
   | "file"
@@ -26,7 +25,6 @@ export type IconName =
   | "alert"
   | "shield"
   | "trash"
-  | "download"
   | "lock"
   | "info"
   | "chevron-right"
@@ -35,12 +33,6 @@ export type IconName =
   | "folder";
 
 const ICONS: Record<IconName, JSX.Element> = {
-  home: (
-    <>
-      <path d="M3 9.5 12 3l9 6.5V20a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 20Z" />
-      <path d="M9 21.5v-7h6v7" />
-    </>
-  ),
   disk: (
     <>
       <line x1="22" y1="12" x2="2" y2="12" />
@@ -162,13 +154,6 @@ const ICONS: Record<IconName, JSX.Element> = {
       <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
       <line x1="10" y1="11" x2="10" y2="17" />
       <line x1="14" y1="11" x2="14" y2="17" />
-    </>
-  ),
-  download: (
-    <>
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <path d="m7 10 5 5 5-5" />
-      <path d="M12 15V3" />
     </>
   ),
   lock: (

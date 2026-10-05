@@ -188,7 +188,6 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
 
 /* ===== 工具页内部（铺满） ===== */
 .tool { display: flex; flex-direction: column; gap: 16px; }
-.tool-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .tool-heading h2 { font-size: var(--fs-xl); display: flex; align-items: center; gap: 9px; letter-spacing: -0.02em; color: var(--text); }
 .tool-icon { display: inline-flex; color: var(--text-body); }
 .tool-body { display: flex; flex-direction: column; gap: 16px; }
@@ -342,7 +341,6 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
 .file-row .col-owner { color: var(--text-muted); }
 .file-row .col-mtime { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-muted); }
 .file-row .col-path { color: var(--text-dim); font-size: var(--fs-xs); font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.virtual-spacer { pointer-events: none; }
 .loading-row, .empty-row { text-align: center; padding: 22px; color: var(--text-muted); font-size: var(--fs-base); }
 .file-skeleton { padding: 10px 16px; display: flex; flex-direction: column; gap: 2px; }
 .file-skel-row { height: var(--row-h); border-radius: var(--radius-sm); }
@@ -474,8 +472,6 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
 .modal .modal-actions .btn { height: 36px; padding: 0 var(--space-4); }
 .modal .modal-actions .btn.danger { background: var(--danger); border-color: var(--danger); color: #FFFFFF; font-weight: var(--fw-semibold); }
 .modal .modal-actions .btn.danger:hover:not(:disabled) { background: var(--danger-hover); border-color: var(--danger-hover); }
-.modal .modal-result { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); padding: 10px 12px; font-size: var(--fs-base); margin-top: 12px; }
-
 /* ===== 表格 ===== */
 .table-wrap { overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
 .data-table { width: 100%; border-collapse: collapse; font-size: var(--fs-base); }
@@ -837,12 +833,7 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
 /* 设置页：窄窗口下导航与正文纵向堆叠 */
 @media (max-width: 900px) {
   .settings { flex-direction: column; }
-  .settings-nav { width: 100%; flex-direction: row; flex-wrap: wrap; position: static; }
-  .settings-nav-item { flex: 1; min-width: 120px; justify-content: center; }
 }
-
-/* 工具头部：描述与扫描控件垂直对齐更稳 */
-.tool-header { align-items: flex-end; }
 
 /* 文件列表底部栏按钮主次分明：主操作加粗色 */
 .file-bottom-bar .btn.danger { box-shadow: none; }
@@ -1017,11 +1008,6 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
   display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-7);
   padding: 22px 24px; border: 1px solid var(--border); border-radius: var(--radius-lg);
   background: var(--panel-grad); box-shadow: var(--inset-hi), var(--shadow-sm);
-}
-/* 一处氛围光，透明度压在 8% 以内（材质要求：不纯平，但不做大横幅渐变） */
-.hero-glow {
-  position: absolute; inset: -60% 40% auto -10%; height: 220px; pointer-events: none;
-  background: radial-gradient(60% 60% at 30% 30%, color-mix(in srgb, var(--ok) 8%, transparent) 0%, transparent 70%);
 }
 .hero-main { position: relative; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .hero-label { font-size: var(--fs-sm); color: var(--text-muted); letter-spacing: 0.02em; }

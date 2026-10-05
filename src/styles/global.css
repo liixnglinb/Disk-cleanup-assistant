@@ -267,17 +267,8 @@ a:hover { text-decoration: underline; }
 
 .muted { color: var(--text-muted); }
 .dim { color: var(--text-dim); }
-.mono { font-family: var(--font-mono); }
-
-/* 仅供读屏：图标按钮等只有 aria-label 时，用这个类把标签文本放进 DOM。
-   用 clip 而非 display:none —— 后者会让部分读屏器跳过该节点。 */
-.sr-only {
-  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
-}
-
 /* 数字一律等宽 + tabular，扫描时跳动不晃屏 */
-.num, .stat-num, .size, .bytes {
+.num, .size, .bytes {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
@@ -338,24 +329,10 @@ a:hover { text-decoration: underline; }
 [data-theme="dark"] .skeleton::after {
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
 }
-.skeleton-row { height: 14px; margin: 10px 0; }
-
 /* 物理按压反馈：可点控件按下时轻微下沉 */
 .btn:active:not(:disabled),
 .icon-btn:active:not(:disabled),
 .switch:active .knob { transform: scale(0.975); }
-
-/* 进度条 */
-.progress-bar {
-  position: relative; overflow: hidden; height: 5px;
-  border-radius: var(--radius-full); background: var(--surface-hover);
-}
-.progress-bar > i {
-  position: absolute; inset: 0; border-radius: inherit;
-  background: var(--primary);
-  transition: width 0.28s var(--ease-out);
-}
-.progress-label { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted); }
 
 /* ---------------------------------------------------------------------------
    Reduced Motion：非必要动效降级为静态。
