@@ -1,3 +1,5 @@
+import type { IconName } from "../components/icons";
+
 export function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes)) return "未知";
   if (!bytes) return "0 B";
@@ -67,13 +69,15 @@ export const RISK_META: Record<string, { label: string; cls: string }> = {
 };
 
 // ===== 清理知识库（目录百科）元数据 =====
-export const KB_CATEGORY_META: Record<string, { label: string; color: string; icon: string }> = {
-  system_core: { label: "系统核心", color: "var(--cat-system)", icon: "" },
-  system_cache: { label: "系统缓存", color: "var(--cat-download)", icon: "" },
-  system_temp: { label: "系统临时", color: "var(--cat-unknown)", icon: "" },
-  app_cache: { label: "软件缓存", color: "var(--cat-cache)", icon: "" },
-  app_data: { label: "软件数据", color: "var(--cat-large)", icon: "" },
-  user_data: { label: "用户文件", color: "var(--cat-docs)", icon: "" },
+// icon 用的是全站 SVG 图标集的键名（不是 emoji）：六个类目以前全填 ""，
+// 于是每张百科卡片左侧那个 30×30 的图标位一直是个空格子。
+export const KB_CATEGORY_META: Record<string, { label: string; color: string; icon: IconName }> = {
+  system_core: { label: "系统核心", color: "var(--cat-system)", icon: "shield" },
+  system_cache: { label: "系统缓存", color: "var(--cat-download)", icon: "eraser" },
+  system_temp: { label: "系统临时", color: "var(--cat-unknown)", icon: "file" },
+  app_cache: { label: "软件缓存", color: "var(--cat-cache)", icon: "package" },
+  app_data: { label: "软件数据", color: "var(--cat-large)", icon: "folder" },
+  user_data: { label: "用户文件", color: "var(--cat-docs)", icon: "archive" },
 };
 
 export const KB_RECOMMENDATION_META: Record<string, { label: string; cls: string }> = {

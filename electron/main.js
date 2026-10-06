@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, Notification, Menu } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, Notification, Menu, dialog } = require("electron");
 const crypto = require("crypto");
 const path = require("path");
 const { autoUpdater } = require("electron-updater");
@@ -33,6 +33,46 @@ let mainWindow = null;
 function send(channel, payload) {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send(channel, payload);
+  }
+}
+
+/**
+ * 收掉后端进程树。模块级函数，三处退出钩子与"更新并重启"都要能调到它。
+ *
+ * 必须同步执行：process.on("exit") 里注册的函数不能再依赖异步回调 ——
+ * 事件循环已经停了，execFile 的回调根本来不及跑，python.exe 就成了孤儿，
+ * 下次启动还占着端口。taskkill /T 连子进程一起收（dev 下是 python.exe→python.exe
+ * 两级，只杀一级不够）。后端自己还有父进程看门狗（backend/core/watchdog.py）
+ * 作为最后一道保障，但它要等心跳超时才动手，不能指望它替安装让路。
+ */
+function killBackendTree() {
+  if (!backendHandle || !backendHandle.child) return;
+  const child = backendHandle.child;
+  const pid = child.pid;
+  const killChild = () => {
+    try {
+      child.kill();
+    } catch (_) {
+      /* 已退出 */
+    }
+  };
+  // 先置空再动手，保证多次调用幂等：只有第一次真正清理。
+  backendHandle = null;
+  if (!pid) return;
+  if (process.platform !== "win32") {
+    killChild();
+    return;
+  }
+  const cp = require("child_process");
+  try {
+    cp.execFileSync("taskkill", ["/PID", String(pid), "/T", "/F"], {
+      timeout: 5000,
+      windowsHide: true,
+      stdio: "ignore",
+    });
+  } catch (_) {
+    // taskkill 不存在/超时/非零退出：退回直接杀子进程，至少不留一层
+    killChild();
   }
 }
 
@@ -219,9 +259,24 @@ ipcMain.handle("update:check", async () => {
 });
 
 ipcMain.handle("update:install", () => {
-  // 静默安装：不显示安装向导，装完自动拉起新版本，用户无需重新走安装流程
-  setImmediate(() => autoUpdater.quitAndInstall(true, true));
-  return { ok: true };
+  if (!app.isPackaged) {
+    return { ok: false, error: "开发模式下无法安装更新，请安装打包版本后再试。" };
+  }
+  // 安装包真在下好的那份才装。以前这里无条件返回 {ok:true}：没下载完 / 下载失败
+  // 时点"更新并重启"也会像成功一样关窗口，用户重开还是旧版本。
+  if (!downloadedVersion) {
+    return { ok: false, error: "新版本安装包还没下载完成，请稍等后再点。" };
+  }
+  try {
+    // 先把后端收掉：安装器要替换 resources\backend\*.exe，python 占着文件会让
+    // 安装半途失败。killBackendTree 是同步的，返回时端口已经释放。
+    killBackendTree();
+    // 静默安装：不显示安装向导，装完自动拉起新版本，用户无需重新走安装流程
+    setImmediate(() => autoUpdater.quitAndInstall(true, true));
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String((err && err.message) || err) };
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -292,8 +347,11 @@ if (!gotLock) {
     // 渲染层若被注入，location= 跳转后 preload 会在新页面上重跑，
     // 那个页面就能拿到带 getApiToken 的 dca API。
     mainWindow.webContents.on("will-navigate", (e, url) => {
-      const current = mainWindow.webContents.getURL();
-      if (url !== current) e.preventDefault();
+      // 用事件自己的 sender，别去摸模块级的 mainWindow：窗口 closed 后那个引用
+      // 不会被清空，之后触发的导航会抛 "Object has been destroyed"。
+      const wc = e.sender;
+      if (!wc || wc.isDestroyed()) return;
+      if (url !== wc.getURL()) e.preventDefault();
     });
   }
 
@@ -346,11 +404,21 @@ if (!gotLock) {
       backendHandle = await startBackend(apiToken);
       console.log("[disk-cleanup-assistant] backend running on", backendHandle.port);
     } catch (err) {
-      console.error("[disk-cleanup-assistant] backend failed to start:", err);
-      backendHandle = null;
-      apiToken = null;
+      const why = String((err && err.message) || err);
+      console.error("[disk-cleanup-assistant] backend failed to start:", why);
+      // 原来这里只是把 backendHandle/apiToken 置空，然后带着硬编码端口 17650
+      // 继续开窗口：界面每个面板都是空的，用户只当软件坏了；而且空 token
+      // 打到的可能是上一次残留的孤儿后端，返回的全是 401。启动失败要当面说清。
+      dialog.showErrorBox(
+        "磁盘清理助手启动失败",
+        `本地服务没能启动：${why}\n\n` +
+          `详细信息见日志：${path.join(process.env.APPDATA || "", "disk-cleanup-assistant", "backend_stderr.log")}\n\n` +
+          "如果反复出现，请重新安装本软件（卸载不会影响你的清理记录）。",
+      );
+      app.quit();
+      return;
     }
-    const port = backendHandle ? backendHandle.port : 17650;
+    const port = backendHandle.port;
     createWindow(port, apiToken);
     scheduleStartupCheck();
 
@@ -362,42 +430,6 @@ if (!gotLock) {
   app.on("window-all-closed", () => {
     if (process.platform !== "darwin") app.quit();
   });
-
-  function killBackendTree() {
-    if (!backendHandle || !backendHandle.child) return;
-    // 先把子进程句柄取出来：backendHandle 马上要被置空，兜底分支还要用它。
-    const child = backendHandle.child;
-    const pid = child.pid;
-    const killChild = () => {
-      try {
-        child.kill();
-      } catch (_) {
-        /* ignore */
-      }
-    };
-    // 先置空再动手，保证三处钩子（before-quit / will-quit / process.on("exit")）幂等：
-    // 只有第一次调用真正清理，后续调用直接返回。
-    backendHandle = null;
-    if (!pid) return;
-    if (process.platform !== "win32") {
-      // 非 Windows 上 taskkill 不存在，直接杀子进程。
-      killChild();
-      return;
-    }
-    try {
-      // 尽力而为（不是可靠保障）：taskkill /T 能连子进程一起收，dev 下后端是
-      // python.exe → python.exe 两级，只 kill 一级不够。但本函数也会在
-      // process.on("exit") 里跑，退出期做异步 execFile 不可靠（可能来不及执行），
-      // 所以它只是兜底清理；真正的可靠保障由后续任务的父进程看门狗负责。
-      require("child_process").execFile("taskkill", ["/PID", String(pid), "/T", "/F"], (err) => {
-        // taskkill 不存在（ENOENT）或执行失败（非零退出）时，退回 child.kill()
-        // 至少收掉直接子进程，避免留孤儿。
-        if (err) killChild();
-      });
-    } catch (_) {
-      killChild();
-    }
-  }
 
   app.on("before-quit", killBackendTree);
   app.on("will-quit", killBackendTree);

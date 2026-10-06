@@ -32,14 +32,15 @@ export default function TitleBar() {
       <div className="titlebar-drag" />
       {/* 更新胶囊已移到右下角浮动（见 Shell），标题栏只留抽屉与主题 */}
       <div className="titlebar-actions no-drag">
-        <button className={`icon-btn ${drawer === "kb" ? "on" : ""}`} title="目录百科" onClick={() => openDrawer("kb")}>
+        <button className={`icon-btn ${drawer === "kb" ? "on" : ""}`} aria-label="打开目录百科" title="目录百科" onClick={() => openDrawer("kb")}>
           <Icon name="search" size={16} />
         </button>
-        <button className={`icon-btn ${drawer === "logs" ? "on" : ""}`} title="删除日志" onClick={() => openDrawer("logs")}>
+        <button className={`icon-btn ${drawer === "logs" ? "on" : ""}`} aria-label="打开删除日志" title="删除日志" onClick={() => openDrawer("logs")}>
           <Icon name="log" size={16} />
         </button>
         <button
           className="icon-btn"
+          aria-label={theme === "dark" ? "切换到浅色主题" : "切换到深色主题"}
           title={theme === "dark" ? "切换到浅色主题" : "切换到深色主题"}
           onClick={toggleTheme}
         >

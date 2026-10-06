@@ -7,6 +7,7 @@ import { useToast } from "../store/ToastContext";
 import { KB_RECOMMENDATION_META, kbRiskLabel } from "../utils/format";
 import { loadSettings } from "../store/settings";
 import ConfirmModal from "./ConfirmModal";
+import { errMsg } from "../utils/errMsg";
 
 type RecFilter = "all" | "recommend" | "caution";
 
@@ -16,6 +17,7 @@ interface Props {
 
 export default function CachePanel({ onOpenKb }: Props) {
   const [overview, setOverview] = useState<CacheOverview | null>(null);
+  const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<CacheCandidate[]>([]);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -28,12 +30,18 @@ export default function CachePanel({ onOpenKb }: Props) {
   const toast = useToast();
 
   const load = useCallback(async () => {
+    // 成功时必须把错误条收起来：以前只在失败分支 setError，
+    // 一次失败之后即便刷新成功，那条红色提示会一直挂在页面上。
+    setError(null);
+    setLoading(true);
     try {
       const ov = await api.cacheOverview();
       setOverview(ov);
       setItems(ov.items);
     } catch (e) {
-      setError(String(e instanceof Error ? e.message : e));
+      setError(errMsg(e));
+    } finally {
+      setLoading(false);
     }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -86,7 +94,7 @@ export default function CachePanel({ onOpenKb }: Props) {
       setOverview(ov);
       setItems(ov.items);
     } catch (e) {
-      setError(String(e instanceof Error ? e.message : e));
+      setError(errMsg(e));
     } finally {
       setBusy(false);
     }
@@ -124,9 +132,9 @@ export default function CachePanel({ onOpenKb }: Props) {
         <button className="btn danger" onClick={() => setConfirmOpen(true)} disabled={checked.size === 0 || busy}>
           {busy ? "清理中…" : `清理所选 (${checked.size})`}
         </button>
-        <button className="btn" onClick={load} disabled={busy}>刷新</button>
+        <button className="btn" onClick={load} disabled={loading || busy}>{loading ? "读取中…" : "刷新"}</button>
         <input className="search" aria-label="按缓存名或所属软件搜索" placeholder="缓存名 / 所属软件…" value={keyword} onChange={(e) => setKeyword(e.target.value)} />
-        <select value={recFilter} onChange={(e) => setRecFilter(e.target.value as RecFilter)}>
+        <select value={recFilter} aria-label="按清理建议筛选缓存位置" onChange={(e) => setRecFilter(e.target.value as RecFilter)}>
           <option value="all">全部建议</option>
           <option value="recommend">仅推荐清理</option>
           <option value="caution">仅谨慎清理</option>
@@ -144,17 +152,22 @@ export default function CachePanel({ onOpenKb }: Props) {
         <span className="toolbar-total">显示 {shown.length} / {items.length} 个位置 · 共 {formatBytes(totalBytes)}</span>
       </div>
 
-      {error && <div className="notice error">{error}</div>}
+      {error && (
+        <div className="notice error" role="alert">
+          缓存位置读取失败：{error}
+          <button className="btn small" style={{ marginLeft: 10 }} onClick={load} disabled={loading}>重试</button>
+        </div>
+      )}
 
       <div className="cache-list">
-        {items.length === 0 && !error && overview === null && (
+        {items.length === 0 && !error && loading && (
           <div className="cache-skeleton">
             {[0, 1, 2].map((i) => (
               <div key={i} className="skeleton cache-skel-row" />
             ))}
           </div>
         )}
-        {items.length === 0 && !error && overview !== null && <div className="empty">未识别到可清理的缓存目录</div>}
+        {items.length === 0 && !error && !loading && <div className="empty">未识别到可清理的缓存目录</div>}
         {shown.map((c) => {
           const rec = KB_RECOMMENDATION_META[c.recommendation ?? "caution"] ?? { label: "谨慎清理", cls: "badge-caution" };
           const open = expanded.has(c.path);
@@ -163,6 +176,7 @@ export default function CachePanel({ onOpenKb }: Props) {
               <div className="cache-row" onClick={() => toggleExpand(c.path)}>
                 <input
                   type="checkbox"
+                  aria-label={`勾选 ${c.label || c.path}`}
                   checked={checked.has(c.path)}
                   onChange={(e) => { e.stopPropagation(); toggle(c.path, e.target.checked); }}
                 />

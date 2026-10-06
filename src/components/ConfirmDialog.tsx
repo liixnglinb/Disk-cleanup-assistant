@@ -6,6 +6,7 @@ import type { DeleteResult } from "../types";
 import { baseName, formatBytes } from "../utils/format";
 import Icon from "./icons";
 import { useModalFocus } from "../hooks/useModalFocus";
+import { errMsg } from "../utils/errMsg";
 
 /**
  * 通用确认模式（可选）：传入 title 即走通用文案，不涉及删除流程，
@@ -140,7 +141,7 @@ export default function ConfirmDialog({
       try { await onDone?.(); }
       catch { setError("清理请求已完成，但结果列表刷新失败；请关闭报告后重新读取扫描结果。"); }
     } catch (e) {
-      setError(String(e instanceof Error ? e.message : e));
+      setError(errMsg(e));
     } finally {
       setBusy(false);
     }

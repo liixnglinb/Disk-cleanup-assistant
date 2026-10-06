@@ -6,6 +6,7 @@ import type { DriveInfo, FileRecord } from "../types";
 import { CATEGORY_META, formatBytes, RECOMMENDATION_META, baseName } from "../utils/format";
 import { useSettings } from "../store/settings";
 import { useFluidNumber } from "../hooks/useFluidNumber";
+import { errMsg } from "../utils/errMsg";
 
 interface Props {
   onOpenFiles: (filter?: { category?: string; recommendation?: string; keyword?: string }) => void;
@@ -32,7 +33,7 @@ export default function OverviewPanel({ onOpenFiles }: Props) {
     setRecsError(null);
     api.queryFiles({ scan_id: scanId, recommendation: "recommend", sort: "size_desc", page: 0, page_size: 8 })
       .then((r) => setRecs(r.items))
-      .catch((e) => { setRecs([]); setRecsError(String(e instanceof Error ? e.message : e)); });
+      .catch((e) => { setRecs([]); setRecsError(errMsg(e)); });
   }, [scanId]);
 
   const running = status?.status === "running" || status?.status === "starting";
@@ -161,7 +162,8 @@ export default function OverviewPanel({ onOpenFiles }: Props) {
             <div className="bento-scan animate-in">
               <div className="bento-scan-title">
                 <h3>分类占比</h3>
-                <span className="link" onClick={() => onOpenFiles({})}>全部 →</span>
+                {/* 键盘可达：.link 以前是 span，鼠标能点、Tab 到不了 */}
+                <button type="button" className="link" onClick={() => onOpenFiles({})}>全部 →</button>
               </div>
               <div className="cat-scale">
                 {cats.map(([k, v], i) => {
@@ -202,7 +204,7 @@ export default function OverviewPanel({ onOpenFiles }: Props) {
           <section className="home-section animate-in">
             <div className="home-section-title">
               <h3>推荐清理（深度解析）</h3>
-              <span className="link" onClick={() => onOpenFiles({ recommendation: "recommend" })}>更多 →</span>
+              <button type="button" className="link" onClick={() => onOpenFiles({ recommendation: "recommend" })}>更多 →</button>
             </div>
             {recsError ? (
               <div className="notice error" role="alert">推荐项读取失败：{recsError}</div>
@@ -211,7 +213,9 @@ export default function OverviewPanel({ onOpenFiles }: Props) {
             ) : (
               <div className="rec-list">
                 {recs.map((r) => (
-                  <button className="rec-row" key={r.id} onClick={() => onOpenFiles({ recommendation: "recommend" })} style={{ textAlign: "left" }}>
+                  // 点某一条就该看到那一条：只带 recommendation 的话，
+                  // 六行推荐跳过去长得一模一样，用户以为点了没反应。
+                  <button className="rec-row" key={r.id} onClick={() => onOpenFiles({ recommendation: "recommend", keyword: baseName(r.path) })} style={{ textAlign: "left" }}>
                     <span className="rec-size num">{formatBytes(r.size)}</span>
                     <div style={{ minWidth: 160, maxWidth: 280 }}>
                       <div className="rec-name">{baseName(r.path)}</div>

@@ -217,21 +217,26 @@ def get_config() -> dict:
     return out
 
 
-def set_config(endpoint: str, api_key: str, model: str, timeout_s: int = 30) -> dict:
-    """保存配置。api_key 为空时清除。endpoint 当场校验，不合法直接拒绝。"""
+def set_config(endpoint: str, api_key: str, model: str, timeout_s: int = 30,
+               clear_key: bool = False) -> dict:
+    """保存配置。
+
+    api_key 留空 = 保持现有 Key 不变（界面上的占位文案就是这么承诺的）；
+    要清空必须显式传 clear_key=True。旧实现把空值当清除，而保存成功后界面
+    又会把输入框清空 —— 于是"只改个模型名"这一次保存就把 Key 抹掉了。
+    endpoint 当场校验，不合法直接拒绝，不落盘。
+    """
     cfg = _load_config()
     cfg["endpoint"] = validate_endpoint(endpoint or _DEFAULTS["endpoint"])
     cfg["model"] = _as_text(model).strip() or _DEFAULTS["model"]
     cfg["timeout_s"] = _as_int(timeout_s, 30)
     incoming = _as_text(api_key).strip()
     # 界面回显的是脱敏 hint（形如 sk-x****3456）。带 **** 的提交是误传，
-    # 保留原 Key，而不是把脱敏串当真 Key 覆盖进去。
-    if incoming and "****" in incoming:
-        cfg["api_key"] = cfg.get("api_key", "")
-    elif incoming:
-        cfg["api_key"] = incoming
-    else:
+    # 按"未修改"处理，而不是把脱敏串当真 Key 覆盖进去。
+    if clear_key:
         cfg["api_key"] = ""
+    elif incoming and "****" not in incoming:
+        cfg["api_key"] = incoming
     _save_config(cfg)
     return get_config()
 

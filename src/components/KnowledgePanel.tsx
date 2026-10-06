@@ -8,6 +8,8 @@ import {
   kbRecommendationColor,
   kbRiskLabel,
 } from "../utils/format";
+import { errMsg } from "../utils/errMsg";
+import type { IconName } from "./icons";
 
 type RecFilter = "all" | "recommend" | "caution" | "keep" | "system";
 type CatFilter = "all" | FolderKbItem["category"];
@@ -30,7 +32,7 @@ export default function KnowledgePanel() {
       setItems(folders.items);
       setMeta(cats);
     } catch (e) {
-      setError(String(e instanceof Error ? e.message : e));
+      setError(errMsg(e));
     } finally {
       setLoading(false);
     }
@@ -89,14 +91,14 @@ export default function KnowledgePanel() {
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
         />
-        <select value={recFilter} onChange={(e) => setRecFilter(e.target.value as RecFilter)}>
+        <select value={recFilter} aria-label="按清理建议筛选目录" onChange={(e) => setRecFilter(e.target.value as RecFilter)}>
           <option value="all">全部建议</option>
           <option value="recommend">推荐清理</option>
           <option value="caution">谨慎清理</option>
           <option value="keep">建议保留</option>
           <option value="system">系统必留</option>
         </select>
-        <select value={catFilter} onChange={(e) => setCatFilter(e.target.value as CatFilter)}>
+        <select value={catFilter} aria-label="按用途分类筛选目录" onChange={(e) => setCatFilter(e.target.value as CatFilter)}>
           <option value="all">全部分类</option>
           {Object.entries(KB_CATEGORY_META).map(([k, v]) => (
             <option key={k} value={k}>{v.label}</option>
@@ -134,12 +136,12 @@ export default function KnowledgePanel() {
       {/* 条目卡片 */}
       <div className="kb-list">
         {shown.map((it) => {
-          const cat = KB_CATEGORY_META[it.category] ?? { label: it.category, color: "#888", icon: "" };
+          const cat = KB_CATEGORY_META[it.category] ?? { label: it.category, color: "#888", icon: "folder" as IconName };
           const rec = KB_RECOMMENDATION_META[it.recommendation] ?? { label: it.recommendation, cls: "badge-muted" };
           return (
             <div className={`kb-item kb-${it.recommendation}`} key={it.id}>
               <div className="kb-item-head">
-                <span className="kb-item-icon" style={{ color: cat.color }}>{cat.icon}</span>
+                <span className="kb-item-icon" style={{ color: cat.color }} aria-hidden="true"><Icon name={cat.icon} size={18} /></span>
                 <div className="kb-item-title">
                   <div className="kb-name">{it.name}</div>
                   <div className="kb-app">
@@ -181,7 +183,7 @@ export default function KnowledgePanel() {
                       // 此前是 .catch(() => {})：点了没反应也不说为什么，
                       // 与 FileTable / CachePanel 同操作会提示的行为不一致
                       api.reveal(it.resolved_path || it.path)
-                        .catch((e) => setError("打开位置失败：" + String(e instanceof Error ? e.message : e)));
+                        .catch((e) => setError("打开位置失败：" + errMsg(e)));
                     }}
                   >
                     <Icon name="folder" size={13} />

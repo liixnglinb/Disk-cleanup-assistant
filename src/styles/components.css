@@ -137,6 +137,15 @@ select, input[type="text"], input[type="search"], input[type="number"], input.se
   font-family: var(--font-ui); font-size: var(--fs-base);
   transition: border var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out); outline: none;
 }
+/* 表单控件的键盘焦点环。
+   全局那条 :focus-visible 的特异性是 (0,1,0)，比上面这条 input[type=...] (0,1,1) 低，
+   于是输入框拿到焦点时 outline 仍是 none —— Tab 键过来完全看不出焦点在哪。
+   这里用同等特异性补回来，描边保持和全局一致。 */
+select:focus-visible,
+input[type="text"]:focus-visible, input[type="search"]:focus-visible,
+input[type="number"]:focus-visible, input.search:focus-visible {
+  outline: 2px solid var(--primary); outline-offset: 2px;
+}
 /* 下拉框自绘箭头：原生箭头在 Windows 上贴边且不受主题控制，看不出"这是个可点的下拉"。
    data URI 里的颜色写死，所以暗色单独覆盖一条。 */
 select {
@@ -238,6 +247,10 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
 .home-section-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .home-section-title h3 { font-size: var(--fs-md); }
 .home-section-title .link { color: var(--primary); cursor: pointer; font-size: var(--fs-sm); font-weight: var(--fw-semibold); }
+/* .link 现在也用在 <button> 上（span 不能键盘聚焦）：清掉按钮默认盒模型，
+   让它和原来的文字链看起来完全一样。 */
+button.link { background: none; border: 0; padding: 0; font: inherit; }
+button.link:hover { text-decoration: underline; }
 
 /* 磁盘概览：一整排均分 */
 .drive-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
@@ -311,12 +324,12 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
    否则表头与内容一旦列数不一致就会错位（此前两者是各自写死一份）。 */
 .data-grid {
   display: grid;
-  grid-template-columns: 58px minmax(170px, 1.5fr) minmax(80px, 0.55fr) minmax(140px, 1.15fr) minmax(110px, 0.9fr) minmax(152px, 1fr) minmax(112px, 0.75fr) minmax(96px, 0.8fr) 44px;
+  grid-template-columns: 58px minmax(170px, 1.5fr) minmax(80px, 0.55fr) minmax(140px, 1.15fr) minmax(110px, 0.9fr) minmax(152px, 1fr) minmax(112px, 0.75fr) minmax(96px, 0.8fr) 60px;
   gap: 10px; align-items: center;
 }
 /* 关闭"文件列表自动预览"时：隐藏用途/所属软件两列，重排 6 列模板 */
 .data-grid.no-preview {
-  grid-template-columns: 58px minmax(170px, 1.8fr) minmax(80px, 0.55fr) minmax(152px, 1fr) minmax(112px, 0.75fr) minmax(96px, 0.8fr) 44px;
+  grid-template-columns: 58px minmax(170px, 1.8fr) minmax(80px, 0.55fr) minmax(152px, 1fr) minmax(112px, 0.75fr) minmax(96px, 0.8fr) 60px;
 }
 
 /* Sticky 表头（方案二要求）。
@@ -352,17 +365,35 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
   display: grid;
   /* 与 .data-grid 同一套列模板。CSS 没有跨选择器的列模板继承，
      只能各写一份 —— 两处必须同步改，列顺序由 DataTable.columns 决定。 */
-  grid-template-columns: 58px minmax(170px, 1.5fr) minmax(80px, 0.55fr) minmax(140px, 1.15fr) minmax(110px, 0.9fr) minmax(152px, 1fr) minmax(112px, 0.75fr) minmax(96px, 0.8fr) 44px;
-  gap: 10px; align-items: center;
+  grid-template-columns: 58px minmax(170px, 1.5fr) minmax(80px, 0.55fr) minmax(140px, 1.15fr) minmax(110px, 0.9fr) minmax(152px, 1fr) minmax(112px, 0.75fr) minmax(96px, 0.8fr) 60px;  gap: 10px; align-items: center;
   height: var(--row-h); padding: 0 16px; border-bottom: 1px solid var(--border); cursor: pointer;
   transition: background var(--dur-fast) var(--ease-out); font-size: var(--fs-table);
 }
-.file-row.no-preview { grid-template-columns: 58px minmax(170px, 1.8fr) minmax(80px, 0.55fr) minmax(152px, 1fr) minmax(112px, 0.75fr) minmax(96px, 0.8fr) 44px; }
+.file-row.no-preview { grid-template-columns: 58px minmax(170px, 1.8fr) minmax(80px, 0.55fr) minmax(152px, 1fr) minmax(112px, 0.75fr) minmax(96px, 0.8fr) 60px; }
 .file-row {
   height: var(--row-h); padding: 0 16px; border-bottom: 1px solid var(--border); cursor: pointer;
   transition: background var(--dur-fast) var(--ease-out); font-size: var(--fs-table);
 }
 .file-row:hover { background: var(--surface-hover); }
+
+/* 窄窗口的列宽降级。
+   默认 9 列模板的列最小宽度合计 962px + 8 条 10px 间距 + 32px 内边距 = 1074px，
+   实测窗口 1200px 时列表内部就开始横向滚动（1366 是好的）。窄一档先让可截断的
+   元信息列收回去，再窄一档干脆收起「最后修改」——它是九列里信息量最低的一列，
+   而且路径/大小已经足够定位文件。 */
+@media (max-width: 1260px) {
+  .data-grid,
+  .file-row {
+    grid-template-columns: 58px minmax(150px, 1.5fr) minmax(72px, 0.55fr) minmax(96px, 1.1fr) minmax(76px, 0.85fr) minmax(120px, 1fr) minmax(92px, 0.72fr) minmax(70px, 0.7fr) 60px;
+  }
+}
+@media (max-width: 1040px) {
+  .data-grid,
+  .file-row {
+    grid-template-columns: 58px minmax(140px, 1.5fr) minmax(68px, 0.55fr) minmax(88px, 1.1fr) minmax(70px, 0.85fr) minmax(110px, 1fr) minmax(66px, 0.7fr) 60px;
+  }
+  .col-mtime { display: none; }
+}
 .file-row.row-locked { opacity: 0.5; cursor: not-allowed; }
 .file-row.row-locked:hover { background: transparent; }
 .file-row.row-large { background: color-mix(in srgb, var(--warn) 6%, var(--surface)); }
@@ -371,9 +402,12 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
 .file-row .col-name .file-tags { display: inline-flex; gap: 8px; margin-left: 8px; vertical-align: middle; }
 .file-row .col-size { font-family: var(--font-mono); font-weight: var(--fw-semibold); color: var(--text); text-align: right; }
 .file-row.row-large .col-size { color: var(--warn); }
+/* 实测这个"问 AI"按钮只有 16×16 = 256px² 的命中面积，连点几行很容易点空。
+   .col-purpose 是 overflow:hidden 的截断单元，所以没法用外扩伪元素补命中区
+   （会被裁掉），只能把按钮本身抬到 22×22。 */
 .file-row .col-purpose .ai-mini {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 16px; height: 16px; margin-left: 4px; padding: 0;
+  width: 22px; height: 22px; margin-left: 4px; padding: 0;
   border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
   background: var(--surface); color: var(--primary); cursor: pointer;
   vertical-align: middle; transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
@@ -391,6 +425,8 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
 /* 行内快捷操作（hover 显示） */
 .col-actions { display: flex; gap: 4px; justify-content: flex-end; opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); }
 .file-row:hover .col-actions, .file-row.row-selected .col-actions { opacity: 1; }
+/* 只靠 hover 浮现的操作区，键盘用户永远打不开：Tab 进来时必须一并显形 */
+.col-actions:hover, .col-actions:focus-within { opacity: 1; }
 .row-act {
   width: 22px; height: 22px; border: 0; border-radius: var(--radius-sm); cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
@@ -614,6 +650,9 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
 .sw-summary b { color: var(--text); font-family: var(--font-mono); }
 
 .sw-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; align-items: start; }
+/* 首屏骨架：跟真实软件卡同宽同高，避免加载完成时整页跳动 */
+.sw-skeleton { height: 96px; border-radius: var(--radius-lg); }
+.sw-loading-note { grid-column: 1 / -1; }
 .sw-card {
   position: relative; display: flex; flex-direction: column;
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
@@ -900,11 +939,6 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
 
 /* 目录百科条目统一内边距，换行时缩进不错位 */
 .kb-item { padding: 13px 15px; }
-
-/* 设置页：窄窗口下导航与正文纵向堆叠 */
-@media (max-width: 900px) {
-  .settings { flex-direction: column; }
-}
 
 /* 文件列表底部栏按钮主次分明：主操作加粗色 */
 .file-bottom-bar .btn.danger { box-shadow: none; }

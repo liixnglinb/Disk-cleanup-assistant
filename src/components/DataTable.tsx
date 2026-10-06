@@ -23,8 +23,6 @@ export interface DataTableColumn {
   /** 与调用方 grid 模板顺序一一对应；同时作为 col-xxx 的类名后缀 */
   key: string;
   label: React.ReactNode;
-  /** 表头额外属性（排序按钮、aria-sort 等） */
-  headExtra?: React.HTMLAttributes<HTMLSpanElement>;
 }
 
 export interface DataTableRenderContext {
@@ -81,11 +79,25 @@ export default function DataTable<T>({
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const headRef = useRef<HTMLDivElement | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
-  // 表头高度放进 state：ref 读取不会触发重渲染，首帧拿不到值会导致
+  // 表头高度与可视区高度都放进 state：ref 读取不会触发重渲染，首帧拿不到值会导致
   // 上方 spacer 少算一截表头高度（表现为第一行被表头压住）。
   const [headH, setHeadH] = useState(0);
+  const [viewport, setViewport] = useState(0);
+  // 尺寸来源必须是 ResizeObserver。以前视口高度是在 render 里读
+  // bodyRef.current?.clientHeight —— 渲染期读 DOM 尺寸既不参与依赖、也不会
+  // 在窗口缩放/DPI 变化后重算，endIndex 会停在旧值，表现为"滚动后一段空白行"。
   useEffect(() => {
-    if (headRef.current) setHeadH(headRef.current.offsetHeight);
+    const el = bodyRef.current;
+    if (!el) return;
+    const measure = () => {
+      setViewport(el.clientHeight);
+      setHeadH(headRef.current ? headRef.current.offsetHeight : 0);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    if (headRef.current) ro.observe(headRef.current);
+    return () => ro.disconnect();
   }, []);
   const onScroll = useCallback(() => {
     const el = bodyRef.current;
@@ -99,8 +111,8 @@ export default function DataTable<T>({
   }, [resetKey]);
 
   const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - OVERS);
-  // 视口高度取自真实容器：容器高度随窗口自适应，不能写死
-  const viewportHeight = bodyRef.current?.clientHeight || 540;
+  // 视口高度取自真实容器：容器高度随窗口自适应，不能写死（0 只出现在挂载前的一帧）
+  const viewportHeight = viewport || 540;
   const endIndex = Math.min(items.length, Math.ceil((scrollTop + viewportHeight) / rowHeight) + OVERS);
   const slice = items.slice(startIndex, endIndex);
   // 表头在滚动容器内且 sticky，占据 scrollTop 的前 headH。
@@ -117,7 +129,10 @@ export default function DataTable<T>({
         <div ref={headRef} className={`data-grid data-grid-head${variant ? " " + variant : ""}`} role="row">
           {headCheckbox && <span role="columnheader" className="col-check">{headCheckbox}</span>}
           {columns.map((c) => (
-            <span key={c.key} role="columnheader" {...c.headExtra}>
+            // 表头必须带上和行单元格同名的 col-xxx 类：窄窗口的列降级
+            // （@media 里 display:none .col-mtime）要同时藏掉表头和数据，
+            // 只藏数据会让表头多出一格、整列错位。
+            <span key={c.key} role="columnheader" className={`col-${c.key}`}>
               {c.label}
             </span>
           ))}
@@ -126,7 +141,9 @@ export default function DataTable<T>({
         {slice.map((item, i) => renderRow(item, startIndex + i, ctx))}
         <div style={{ height: tailHeight }} aria-hidden="true" />
         {loading && items.length === 0 && skeleton}
-        {loading && items.length > 0 && <div className="loading-row">正在加载更多…</div>}
+        {/* 分页窗口是"整页替换"，不存在"加载更多"；这句文案会让人以为
+            继续往下滚还能拉出新数据。 */}
+        {loading && items.length > 0 && <div className="loading-row">正在刷新本页…</div>}
         {!loading && items.length === 0 && (empty ?? <div className="empty-row">暂无数据</div>)}
       </div>
     </div>

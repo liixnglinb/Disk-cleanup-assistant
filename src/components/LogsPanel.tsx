@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import type { LogEntry } from "../types";
 import { formatBytes } from "../utils/format";
 import { useToast } from "../store/ToastContext";
+import { errMsg } from "../utils/errMsg";
 
 export default function LogsPanel() {
   const [items, setItems] = useState<LogEntry[]>([]);
@@ -21,7 +22,7 @@ export default function LogsPanel() {
       setItems(r.items);
       setTotal(r.total ?? r.items.length);
     } catch (e) {
-      setError(String(e instanceof Error ? e.message : e));
+      setError(errMsg(e));
     } finally {
       setLoading(false);
     }
@@ -37,7 +38,7 @@ export default function LogsPanel() {
       await api.exportLogs();
       toast.push({ kind: "ok", message: "已导出 CSV" });
     } catch (e) {
-      toast.push({ kind: "error", message: "导出失败：" + String(e instanceof Error ? e.message : e) });
+      toast.push({ kind: "error", message: "导出失败：" + errMsg(e) });
     } finally {
       setExporting(false);
     }

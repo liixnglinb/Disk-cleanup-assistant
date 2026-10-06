@@ -199,6 +199,10 @@ export interface AiConfig {
   model: string;
   has_api_key: boolean;
   api_key_hint: string;
+  /** Key 的存储方式：dpapi = Windows 用户级加密；plaintext* = 未能加密 */
+  key_storage?: "dpapi" | "plaintext" | "plaintext_legacy";
+  /** 配置文件损坏时的说明（正常时不下发） */
+  config_warning?: string;
 }
 
 export interface AiPreset {

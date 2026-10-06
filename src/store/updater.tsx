@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { errMsg } from "../utils/errMsg";
 
 export interface UpdateState {
   phase: "idle" | "checking" | "latest" | "available" | "downloading" | "ready" | "error";
@@ -84,7 +85,7 @@ export function UpdaterProvider({ children }: { children: React.ReactNode }) {
       );
     } catch (e) {
       // 同上：invoke 本身抛错（主进程异常）也不能把 ready 打掉
-      const msg = String(e instanceof Error ? e.message : e);
+      const msg = errMsg(e);
       setState((p) => (canClobberError(p.phase) ? { phase: "error", error: msg } : p));
     }
   }, []);
@@ -114,7 +115,11 @@ export function UpdaterProvider({ children }: { children: React.ReactNode }) {
   }, [check]);
 
   const install = useCallback(async () => {
-    await window.dca?.installUpdate();
+    const r = await window.dca?.installUpdate();
+    // 主进程拒绝（没下载完 / 非打包环境）时必须报错给界面，否则窗口照常关掉、
+    // 重开还是旧版本，用户以为"更新了"。没有桥（非 Electron）也是同一类失败。
+    if (!r) throw new Error("当前环境不支持自动更新（仅桌面版可用）");
+    if (!r.ok) throw new Error(r.error || "安装未能启动");
   }, []);
 
   const value = useMemo(() => ({ state, check, install }), [state, check, install]);

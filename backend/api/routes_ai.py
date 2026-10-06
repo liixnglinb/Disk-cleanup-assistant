@@ -19,6 +19,8 @@ class ConfigRequest(BaseModel):
     api_key: str = Field(default="", max_length=400)
     model: str = Field(default="", max_length=200)
     timeout_s: int = Field(default=30, ge=10, le=120)
+    # 留空 api_key 是"不改动 Key"，清空必须显式带这个标志（界面有单独的清除按钮）
+    clear_key: bool = False
 
 
 @router.get("/config")
@@ -38,7 +40,8 @@ def set_config(payload: ConfigRequest):
     # 而不是显示"已保存"（旧实现把异常全吞了，Key 根本没落盘）。
     try:
         return ai_analysis.set_config(
-            payload.endpoint, payload.api_key, payload.model, payload.timeout_s
+            payload.endpoint, payload.api_key, payload.model, payload.timeout_s,
+            clear_key=payload.clear_key,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

@@ -1,5 +1,5 @@
 import Icon from "./icons";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { useScan } from "../store/ScanContext";
 import type { DuplicateGroup } from "../types";
@@ -7,6 +7,7 @@ import { baseName, formatBytes, formatTime } from "../utils/format";
 import { useToast } from "../store/ToastContext";
 import ConfirmModal from "./ConfirmModal";
 import { useSettings } from "../store/settings";
+import { errMsg } from "../utils/errMsg";
 
 export default function DuplicatesPanel() {
   const { scanId } = useScan();
@@ -18,18 +19,24 @@ export default function DuplicatesPanel() {
   const [pending, setPending] = useState<string[] | null>(null);
   const toast = useToast();
 
+  // 只认最后一次请求的结果：扫描进行中反复点「重新检测」时，
+  // 先发的慢响应会后到，把新结果覆盖成旧指纹。
+  const reqSeq = useRef(0);
+
   const load = useCallback(async () => {
     if (!scanId) return;
+    const seq = ++reqSeq.current;
     setError(null);
     setBusy(true);
     try {
       const r = await api.duplicates(scanId);
+      if (seq !== reqSeq.current) return;
       setGroups(r.groups);
       const keep: Record<string, string> = {};
       for (const g of r.groups) keep[g.hash] = g.files[0].path;
       setKeepByGroup(keep);
     } catch (e) {
-      setError(String(e instanceof Error ? e.message : e));
+      setError(errMsg(e));
     } finally {
       setBusy(false);
     }
@@ -60,7 +67,7 @@ export default function DuplicatesPanel() {
       toast.push({ kind: "ok", message: `已清理 ${res.ok.length} 个重复副本，释放 ${formatBytes(res.freed_bytes)}` });
       await load();
     } catch (e) {
-      setError(String(e instanceof Error ? e.message : e));
+      setError(errMsg(e));
     } finally {
       setBusy(false);
     }
@@ -76,7 +83,7 @@ export default function DuplicatesPanel() {
         {!scanId && <div className="notice info">请先完成一次扫描。</div>}
         <div className="toolbar">
           <button className="btn danger" onClick={clean} disabled={!scanId || busy || groups.length === 0}>清理多余副本</button>
-          <button className="btn" onClick={load} disabled={!scanId}>重新检测</button>
+          <button className="btn" onClick={load} disabled={!scanId || busy}>重新检测</button>
           <span className="toolbar-total">{groups.length} 组重复</span>
         </div>
         {error && <div className="notice error">{error}</div>}

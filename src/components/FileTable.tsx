@@ -8,6 +8,7 @@ import ConfirmDialog from "./ConfirmDialog";
 import DataTable from "./DataTable";
 import { useToast } from "../store/ToastContext";
 import { useSettings } from "../store/settings";
+import { errMsg } from "../utils/errMsg";
 
 const ROW = 44;
 /* 一页 100 行 = 4,400px 滚动高。此前是 500（22,000px）且触底只追加不清空，
@@ -179,7 +180,7 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
         setAiError(r.message || "AI 分析失败");
       }
     } catch (e) {
-      setAiError(String(e instanceof Error ? e.message : e));
+      setAiError(errMsg(e));
     } finally {
       setAiBusy(false);
     }
@@ -217,7 +218,7 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
         setAiError(res.message || "AI 分析失败");
       }
     } catch (e) {
-      setAiError(String(e instanceof Error ? e.message : e));
+      setAiError(errMsg(e));
     } finally {
       setAiBusy(false);
     }
@@ -241,7 +242,7 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
       setSelectedMany(r.paths, true);
       toast.push({ kind: "ok", message: `已全选 ${r.count} 个文件` });
     } catch (e) {
-      setAiError(String(e instanceof Error ? e.message : e));
+      setAiError(errMsg(e));
     } finally {
       setSelectBusy(false);
     }
@@ -265,7 +266,7 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
       setSelectedMany(r.paths, true);
       toast.push({ kind: "ok", message: `已勾选 ${r.count} 个文件` });
     } catch (e) {
-      setAiError(String(e instanceof Error ? e.message : e));
+      setAiError(errMsg(e));
     } finally {
       setSelectBusy(false);
     }
@@ -394,7 +395,9 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
               ref={headerRef}
               aria-busy={selectBusy || undefined}
               type="checkbox"
-              disabled={loading || selectBusy || !items.length}
+              // 整页都是系统保护文件时，onHeaderToggle 会直接 return —— 那种情况下
+              // 复选框必须禁用，否则点起来像个坏掉的控件（看着能勾，什么都不发生）。
+              disabled={loading || selectBusy || !items.some((r) => r.is_locked !== 1)}
               aria-label="勾选或取消勾选本页全部可清理文件（跨页请用工具栏的「全选筛选结果」）"
               aria-checked={headerIndeterminate ? "mixed" : allVisible && someVisible}
               checked={allVisible && someVisible}
@@ -455,6 +458,7 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
                   {!locked && !aiRes && !aiHandled.current.has(rec.path) && (
                     <button
                       className="ai-mini"
+                      aria-label="让 AI 分析这个文件"
                       onClick={(e) => { e.stopPropagation(); analyzeSingle(rec); }}
                       disabled={aiBusy}
                       title="AI 分析此文件（只传元信息，不上传内容）"
@@ -482,10 +486,10 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
               <span role="cell" className="col-actions">
                 {!locked && (
                   <>
-                    <button className="row-act" title="在资源管理器中打开所在位置" onClick={() => api.reveal(rec.path).catch(() => toast.push({ kind: "error", message: "无法打开位置" }))}>
+                    <button className="row-act" aria-label="在资源管理器中打开所在位置" title="在资源管理器中打开所在位置" onClick={() => api.reveal(rec.path).catch(() => toast.push({ kind: "error", message: "无法打开位置" }))}>
                       <Icon name="folder" size={13} />
                     </button>
-                    <button className="row-act danger" title="单行移到回收站" onClick={() => deleteSingle(rec.path)}>
+                    <button className="row-act danger" aria-label="把这一行移到回收站" title="单行移到回收站" onClick={() => deleteSingle(rec.path)}>
                       <Icon name="trash" size={13} />
                     </button>
                   </>

@@ -5,6 +5,7 @@ import type {
   ResidueResult, ScanStatus, ScanStatistics, SoftwareIconResult, SoftwareItem,
   ToolMeta,
 } from "../types";
+import { errMsg } from "../utils/errMsg";
 
 /** Backend port: Electron main appends ?backend=PORT to the loaded URL. */
 function backendBase(): string {
@@ -48,7 +49,7 @@ async function request<T>(path: string, init?: RequestInit & { timeoutMs?: numbe
   try {
     res = await fetch(`${backendBase()}${path}`, { ...init, headers, signal: ctl.signal });
   } catch (e) {
-    throw new Error(e instanceof Error && e.name === "AbortError" ? `请求超时（${Math.round(timeoutMs / 1000)}s 未响应）` : String(e instanceof Error ? e.message : e));
+    throw new Error(e instanceof Error && e.name === "AbortError" ? `请求超时（${Math.round(timeoutMs / 1000)}s 未响应）` : errMsg(e));
   } finally {
     clearTimeout(timer);
   }
@@ -66,7 +67,7 @@ async function downloadFile(path: string, filename: string): Promise<void> {
   try {
     res = await fetch(`${backendBase()}${path}`, { headers, signal: ctl.signal });
   } catch (e) {
-    throw new Error(e instanceof Error && e.name === "AbortError" ? "导出超时" : String(e instanceof Error ? e.message : e));
+    throw new Error(e instanceof Error && e.name === "AbortError" ? "导出超时" : errMsg(e));
   } finally {
     clearTimeout(timer);
   }
@@ -185,7 +186,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-  aiSetConfig: (payload: { endpoint: string; api_key: string; model: string; timeout_s?: number }) =>
+  aiSetConfig: (payload: { endpoint: string; api_key: string; model: string; timeout_s?: number; clear_key?: boolean }) =>
     request<AiConfig>("/api/ai/config", {
       method: "POST",
       body: JSON.stringify(payload),

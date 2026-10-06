@@ -5,6 +5,7 @@ import type { ResidueResult, SoftwareItem } from "../types";
 import { useToast } from "../store/ToastContext";
 import { formatBytes } from "../utils/format";
 import ConfirmModal from "./ConfirmModal";
+import { errMsg } from "../utils/errMsg";
 
 function isIdle(it: SoftwareItem): boolean {
   if (it.last_used) {
@@ -33,7 +34,9 @@ type SortOrder = "size_desc" | "size_asc";
 
 export default function SoftwarePanel() {
   const [items, setItems] = useState<SoftwareItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  // 首屏就得是加载态：列表要枚举注册表，慢的话上千毫秒；
+  // 从 false 起步会让第一帧渲染成"未找到匹配的软件"，那是句假话。
+  const [loading, setLoading] = useState(true);
   // 盘符是运行时枚举出来的（E: / F: / U: 都可能），不能写死成 C: | D: ——
   // 那样只能靠 setDrive(d as any) 绕过类型系统。
   const [drive, setDrive] = useState<"all" | `${string}:`>("all");
@@ -63,7 +66,7 @@ export default function SoftwarePanel() {
       const r = await api.software();
       setItems(r.items);
     } catch (e) {
-      setError(String(e instanceof Error ? e.message : e));
+      setError(errMsg(e));
     } finally {
       setLoading(false);
     }
@@ -77,7 +80,11 @@ export default function SoftwarePanel() {
       loadedIcons.current.add(it.name);
       api.softwareIcon(it.name)
         .then((r) => {
-          setIcons((prev) => ({ ...prev, [it.name]: `data:image/png;base64,${r.icon}` }));
+          // 只在真拿到 base64 时才拼 data URL。缺字段时拼出来的
+          // "data:image/png;base64,undefined" 是一张坏图，控制台还会刷 ERR_INVALID_URL。
+          const b64 = typeof r?.icon === "string" ? r.icon : "";
+          if (!b64) return;
+          setIcons((prev) => ({ ...prev, [it.name]: `data:image/png;base64,${b64}` }));
         })
         .catch(() => {});
     }
@@ -139,7 +146,7 @@ export default function SoftwarePanel() {
         toast.push({ kind: "error", message: r.message });
       }
     } catch (e) {
-      toast.push({ kind: "error", message: String(e instanceof Error ? e.message : e) });
+      toast.push({ kind: "error", message: errMsg(e) });
     } finally {
       setUninstalling(null);
     }
@@ -154,7 +161,7 @@ export default function SoftwarePanel() {
       setResidueFor(it.name);
       toast.push({ kind: "info", message: `发现 ${r.count} 处残留` });
     } catch (e) {
-      toast.push({ kind: "error", message: String(e instanceof Error ? e.message : e) });
+      toast.push({ kind: "error", message: errMsg(e) });
     } finally {
       setResidueBusy(false);
     }
@@ -206,7 +213,7 @@ export default function SoftwarePanel() {
               <input type="checkbox" checked={idleOnly} onChange={(e) => setIdleOnly(e.target.checked)} />
               只看闲置
             </label>
-            <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value as SortOrder)} style={{ height: 30 }}>
+            <select value={sortOrder} aria-label="已安装软件排序方式" onChange={(e) => setSortOrder(e.target.value as SortOrder)} style={{ height: 30 }}>
               <option value="size_desc">大小 ↓（大到小）</option>
               <option value="size_asc">大小 ↑（小到大）</option>
             </select>
@@ -217,10 +224,23 @@ export default function SoftwarePanel() {
         <div className="sw-summary">
           共 <b>{shown.length}</b> 个软件{idleCount > 0 ? ` · 闲置 ${idleCount} 个` : ""}
         </div>
-        {error && <div className="notice error">{error}</div>}
+        {error && (
+          <div className="notice error" role="alert">
+            已安装软件读取失败：{error}
+            <button className="btn small" style={{ marginLeft: 10 }} onClick={load} disabled={loading}>重试</button>
+          </div>
+        )}
       </div>
 
       <div className="sw-grid">
+        {loading && items.length === 0 && (
+          <div className="muted sw-loading-note" role="status">正在读取已安装软件…</div>
+        )}
+        {loading && items.length === 0 && (
+          [0, 1, 2, 3, 4, 5].map((i) => (
+            <div className="skeleton sw-skeleton" key={i} aria-hidden="true" />
+          ))
+        )}
         {shown.map((it) => {
           const idle = isIdle(it);
           const iconUrl = icons[it.name];
@@ -309,7 +329,10 @@ export default function SoftwarePanel() {
                         <button
                           className="btn small danger"
                           onClick={(e) => { e.stopPropagation(); askUninstall(it); }}
-                          disabled={uninstalling === it.name}
+                          // 卸载是整机级操作：只要有一个在进行中，所有卡片都必须禁用。
+                          // 原来按 it.name 判断，A 还在卸载时 B 的按钮仍可点，会并发拉起
+                          // 两个安装器进程互相踩注册表。
+                          disabled={!!uninstalling}
                         >
                           {uninstalling === it.name ? "启动中…" : "一键卸载"}
                         </button>
@@ -330,7 +353,9 @@ export default function SoftwarePanel() {
             </div>
           );
         })}
-        {shown.length === 0 && <div className="empty">未找到匹配的软件</div>}
+        {shown.length === 0 && !loading && !error && (
+          <div className="empty">未找到匹配的软件</div>
+        )}
       </div>
 
       <ConfirmModal

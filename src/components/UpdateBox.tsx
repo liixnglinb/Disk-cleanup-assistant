@@ -3,6 +3,7 @@ import Icon from "./icons";
 import ConfirmDialog from "./ConfirmDialog";
 import { useUpdater } from "../store/updater";
 import { useToast } from "../store/ToastContext";
+import { errMsg } from "../utils/errMsg";
 
 /**
  * 浮动更新胶囊（方案二阶段三）。
@@ -120,7 +121,7 @@ export default function UpdateBox() {
           } catch (e) {
             // 安装失败时胶囊本身不会变状态（error 相位下它直接不渲染），
             // toast 是用户唯一能看到的反馈。
-            toast.push({ kind: "error", message: "安装失败：" + String(e instanceof Error ? e.message : e) });
+            toast.push({ kind: "error", message: "安装失败：" + errMsg(e) });
           }
         }}
       />
