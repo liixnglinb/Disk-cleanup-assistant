@@ -17,6 +17,8 @@ export default function OverviewPanel({ onOpenFiles }: Props) {
   const [drives, setDrives] = useState<DriveInfo[]>([]);
   const [selectedDrive, setSelectedDrive] = useState("");
   const [recs, setRecs] = useState<FileRecord[]>([]);
+  // 读取失败必须与"真的没有推荐项"区分：后者是好消息，前者不能谎报成健康
+  const [recsError, setRecsError] = useState<string | null>(null);
 
   useEffect(() => {
     api.drives().then((r) => {
@@ -27,7 +29,10 @@ export default function OverviewPanel({ onOpenFiles }: Props) {
 
   useEffect(() => {
     if (!scanId) return;
-    api.queryFiles({ scan_id: scanId, recommendation: "recommend", sort: "size_desc", page: 0, page_size: 8 }).then((r) => setRecs(r.items)).catch(() => {});
+    setRecsError(null);
+    api.queryFiles({ scan_id: scanId, recommendation: "recommend", sort: "size_desc", page: 0, page_size: 8 })
+      .then((r) => setRecs(r.items))
+      .catch((e) => { setRecs([]); setRecsError(String(e instanceof Error ? e.message : e)); });
   }, [scanId]);
 
   const running = status?.status === "running" || status?.status === "starting";
@@ -199,7 +204,9 @@ export default function OverviewPanel({ onOpenFiles }: Props) {
               <h3>推荐清理（深度解析）</h3>
               <span className="link" onClick={() => onOpenFiles({ recommendation: "recommend" })}>更多 →</span>
             </div>
-            {recs.length === 0 ? (
+            {recsError ? (
+              <div className="notice error" role="alert">推荐项读取失败：{recsError}</div>
+            ) : recs.length === 0 ? (
               <div className="empty">暂无强烈建议清理的文件，磁盘状态很健康</div>
             ) : (
               <div className="rec-list">

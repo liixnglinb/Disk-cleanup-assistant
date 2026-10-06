@@ -21,6 +21,16 @@ from .platform import platform, router as tools_router, setup_tools
 
 app = FastAPI(title="磁盘清理助手", version=__version__)
 
+
+@app.on_event("startup")
+def _housekeeping():
+    """启动时清理过期扫描库：scans/*.db 每个可达数百 MB，此前只增不减。"""
+    try:
+        from .core.scanner import controller as _scan_controller
+        _scan_controller.prune_old_scans()
+    except Exception:  # noqa: BLE001 清理失败不阻断启动
+        pass
+
 _api_token = os.environ.get('DCA_API_TOKEN', '').strip()
 
 

@@ -42,24 +42,30 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!scanId) return;
     let alive = true;
+    let timer: number | undefined;
+    const TERMINAL = new Set(["completed", "cancelled", "error"]);
     const poll = async () => {
+      let done = false;
       try {
         const st = await api.scanStatus(scanId);
         if (!alive) return;
         setStatus(st);
-        window.dispatchEvent(new CustomEvent("ltb-scan-status", { detail: st }));
-        if (st.status === "completed" || st.status === "cancelled" || st.status === "error") {
+        if (TERMINAL.has(st.status)) {
+          done = true;
           await refreshStatistics();
         }
       } catch (e) {
-        if (alive) setError(String(e instanceof Error ? e.message : e));
+        if (!alive) return;
+        setError(String(e instanceof Error ? e.message : e));
       }
+      // 串行链而不是 setInterval：setInterval 不等上一次返回，后端一旦变慢
+      // 就会堆叠请求；终态后也没有继续轮询的意义。
+      if (alive && !done) timer = window.setTimeout(poll, 1500);
     };
     poll();
-    const iv = setInterval(poll, 1500);
     return () => {
       alive = false;
-      clearInterval(iv);
+      if (timer !== undefined) window.clearTimeout(timer);
     };
   }, [scanId, refreshStatistics]);
 

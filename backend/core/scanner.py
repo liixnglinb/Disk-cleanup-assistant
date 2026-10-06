@@ -16,7 +16,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from .classifier import classify
 from .config import PAGE_SIZE, log_dir
@@ -179,6 +179,12 @@ class ScanController:
             drive = os.path.abspath(drive)
         if not os.path.exists(drive):
             raise ValueError("path does not exist: " + drive)
+        # 同一时刻只允许一个活跃扫描：并发全盘扫描除了抢 I/O 没有任何收益，
+        # 还会让"最近扫描"语义变得含混（recent 取哪个？）。
+        with self._lock:
+            for s in self._sessions.values():
+                if s.thread and s.thread.is_alive() and s.stats.status in ("starting", "running", "paused"):
+                    raise ValueError("已有扫描正在进行，请先取消或等待完成")
         # 用磁盘总用量估算真实进度
         try:
             usage = shutil.disk_usage(drive)
@@ -386,7 +392,20 @@ class ScanController:
             session = _Session(scan_id, drive, db)
             session.stats.total_bytes = total_bytes
             session.stats.drive_free = drive_free
-            session.open_db()
+            try:
+                session.open_db()
+            except sqlite3.Error:
+                # 库文件损坏：隔离成 .corrupt 并按"无此扫描"处理，
+                # 否则 /api/scan/recent 与 /api/files/query 会对它永久 500。
+                try:
+                    session.conn.close()
+                except Exception:
+                    pass
+                try:
+                    db.rename(db.with_suffix(".corrupt"))
+                except OSError:
+                    pass
+                return None
             session.stats.status = "completed"
             session.stats.message = "restored"
             session.stats.end_ms = int(db.stat().st_mtime * 1000)
@@ -449,8 +468,10 @@ class ScanController:
             where.append("size >= ?")
             params.append(min_size)
         if keyword:
-            where.append("(path LIKE ? OR purpose LIKE ? OR owner LIKE ?)")
-            params.extend([f"%{keyword}%", f"%{keyword}%", f"%{keyword}%"])
+            # %/_/\ 是 LIKE 通配符，不转义的话搜 "%" 会匹配全表
+            esc = keyword.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            where.append("(path LIKE ? ESCAPE '\\' OR purpose LIKE ? ESCAPE '\\' OR owner LIKE ? ESCAPE '\\')")
+            params.extend([f"%{esc}%", f"%{esc}%", f"%{esc}%"])
         if only_locked is not None:
             where.append("is_locked = ?")
             params.append(1 if only_locked else 0)
@@ -487,8 +508,8 @@ class ScanController:
             rows = conn.execute(
                 "SELECT id,path,size,mtime,ctime,ext,magic,category,is_locked,is_dir,"
                 "purpose,owner,recommendation,risk,reason AS recommendation_reason,needs_ai "
-                f"FROM files{sql_where} ORDER BY {order} LIMIT {page_size} OFFSET {page * page_size}",
-                params,
+                f"FROM files{sql_where} ORDER BY {order} LIMIT ? OFFSET ?",
+                params + [page_size, page * page_size],
             ).fetchall()
         finally:
             conn.close()
@@ -516,8 +537,9 @@ class ScanController:
             where.append("size >= ?")
             params.append(min_size)
         if keyword:
-            where.append("(path LIKE ? OR purpose LIKE ? OR owner LIKE ?)")
-            params.extend([f"%{keyword}%", f"%{keyword}%", f"%{keyword}%"])
+            esc = keyword.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            where.append("(path LIKE ? ESCAPE '\\' OR purpose LIKE ? ESCAPE '\\' OR owner LIKE ? ESCAPE '\\')")
+            params.extend([f"%{esc}%", f"%{esc}%", f"%{esc}%"])
         if recommendation:
             where.append("recommendation = ?")
             params.append(recommendation)
@@ -584,6 +606,47 @@ class ScanController:
                 pass
         with self._lock:
             self._sessions.pop(scan_id, None)
+
+    def verify_deletable(self, paths: List[str]) -> Tuple[List[str], List[str]]:
+        """删除前的最后防线：路径必须出现在某个扫描库中，且未被系统锁定标记。
+
+        覆盖两类风险：① API 被本地其他进程/被注入的渲染层直调，传入任意路径
+        （_reject_protected 只是前缀黑名单，防不住 C:/Users/任意名 这类）；②
+        UI 勾选态被绕过，锁定文件被提交删除。
+        返回 (not_found 未在任何扫描库中找到的路径, locked 被锁定标记的路径)。
+        """
+        wanted = [p for p in (paths or []) if p]
+        if not wanted:
+            return []
+        with self._lock:
+            sessions = list(self._sessions.values())
+        found: Dict[str, int] = {}
+        for s in sessions:
+            if not s.db_path.exists():
+                continue
+            try:
+                conn = sqlite3.connect(str(s.db_path))
+                try:
+                    for p in wanted:
+                        if p in found:
+                            continue
+                        row = conn.execute(
+                            "SELECT is_locked FROM files WHERE path = ? COLLATE NOCASE LIMIT 1",
+                            (p,),
+                        ).fetchone()
+                        if row is not None:
+                            found[p] = int(row[0] or 0)
+                finally:
+                    conn.close()
+            except sqlite3.Error:
+                continue
+        not_found = [p for p in wanted if p not in found]
+        locked = [p for p in wanted if found.get(p) == 1]
+        return not_found, locked
+
+    def prune_old_scans(self, keep_days: int = 7) -> int:
+        """公开入口：启动时清理过期扫描库（此前该逻辑存在但从未被调用）。"""
+        return self._prune_old_scan_dbs(keep_days)
 
     def _prune_old_scan_dbs(self, keep_days: int = 7) -> int:
         """清理超过 keep_days 且不在活跃会话中的旧扫描库，防止磁盘堆积。"""

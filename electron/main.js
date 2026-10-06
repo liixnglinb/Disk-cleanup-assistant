@@ -46,7 +46,9 @@ const PRIMARY_FEED =
   "https://gh-proxy.com/https://github.com/liixnglinb/Disk-cleanup-assistant/releases/latest/download";
 
 if (!app.isPackaged) autoUpdater.forceDevUpdateConfig = true; // 开发模式读仓库根的 dev-app-update.yml（已 gitignore）
-// 保持 false，由 update-available 处理器显式下载：这样测速可插在检查与下载之间
+// 保持 false，但注意：真正的下载触发点是下面的 update-available 处理器 —— 发现新版
+// 就后台拉包（系统通知也是这么写的），测速只决定"从哪个镜像拉 latest.yml"，
+// 并不参与下载时机。改这里之前先想清楚要不要保留这个自动预下载。
 autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = false; // 必须由用户点「更新并重启」确认，退出时不静默安装
 autoUpdater.allowDowngrade = false;
@@ -89,8 +91,11 @@ autoUpdater.on("error", (err) => {
 });
 
 function versionGt(a, b) {
-  const pa = String(a || "").replace(/^v/, "").split(".").map(Number);
-  const pb = String(b || "").replace(/^v/, "").split(".").map(Number);
+  // 只比三段数字；预发布后缀（-beta.2）先剥掉，否则 Number() 出 NaN，
+  // 而 NaN 的所有比较都是 false → 预发布版永远判为"无更新"。
+  const norm = (v) => String(v || "").replace(/^v/, "").split("-")[0].split(".").map((x) => parseInt(x, 10) || 0);
+  const pa = norm(a);
+  const pb = norm(b);
   for (let i = 0; i < 3; i++) {
     if ((pa[i] || 0) > (pb[i] || 0)) return true;
     if ((pa[i] || 0) < (pb[i] || 0)) return false;
@@ -111,7 +116,9 @@ async function resolveReleaseNotes(version) {
   if (notesCache.tag === tag) return notesCache.text;
   let text = "";
   try {
-    const r = await getText(RELEASE_API + tag, { timeoutMs: 4000 });
+    // version 来自更新源（第三方镜像）的 latest.yml，进 URL 前必须转义，
+    // 否则 ../ ? # 能操纵 api.github.com 的路径。
+    const r = await getText(RELEASE_API + encodeURIComponent(tag), { timeoutMs: 4000 });
     if (r && r.ok && r.text) {
       text = releaseNotesToPlainText(JSON.parse(r.text).body);
     }
@@ -279,6 +286,14 @@ if (!gotLock) {
         shell.openExternal(url);
       }
       return { action: "deny" };
+    });
+
+    // 也不许本窗口自己被导航走：setWindowOpenHandler 只管 window.open，
+    // 渲染层若被注入，location= 跳转后 preload 会在新页面上重跑，
+    // 那个页面就能拿到带 getApiToken 的 dca API。
+    mainWindow.webContents.on("will-navigate", (e, url) => {
+      const current = mainWindow.webContents.getURL();
+      if (url !== current) e.preventDefault();
     });
   }
 

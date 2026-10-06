@@ -5,9 +5,11 @@ import { useScan } from "../store/ScanContext";
 import { loadSettings } from "../store/settings";
 import type { DriveInfo } from "../types";
 import { formatBytes } from "../utils/format";
+import { useToast } from "../store/ToastContext";
 
 export default function ScanControl() {
   const { status, startScan, pause, resume } = useScan();
+  const toast = useToast();
   const [drives, setDrives] = useState<DriveInfo[]>([]);
   const [selectedDrive, setSelectedDrive] = useState("");
   const [starting, setStarting] = useState(false);
@@ -18,7 +20,12 @@ export default function ScanControl() {
         setDrives(r.items);
         if (r.items.length) setSelectedDrive((p) => p || r.items[0].drive);
       })
-      .catch(() => {});
+      // 盘符读不到时下拉框是空的，不吭声用户只会觉得"软件坏了"
+      .catch((e) => {
+        setDrives([]);
+        toast.push({ kind: "error", message: "无法读取盘符列表：" + String(e instanceof Error ? e.message : e) });
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const running = status?.status === "running" || status?.status === "starting";

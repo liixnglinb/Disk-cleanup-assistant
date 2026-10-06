@@ -125,7 +125,7 @@ export default function CachePanel({ onOpenKb }: Props) {
           {busy ? "清理中…" : `清理所选 (${checked.size})`}
         </button>
         <button className="btn" onClick={load} disabled={busy}>刷新</button>
-        <input className="search" placeholder="搜索缓存名 / 所属软件…" value={keyword} onChange={(e) => setKeyword(e.target.value)} />
+        <input className="search" aria-label="按缓存名或所属软件搜索" placeholder="缓存名 / 所属软件…" value={keyword} onChange={(e) => setKeyword(e.target.value)} />
         <select value={recFilter} onChange={(e) => setRecFilter(e.target.value as RecFilter)}>
           <option value="all">全部建议</option>
           <option value="recommend">仅推荐清理</option>
@@ -195,7 +195,6 @@ export default function CachePanel({ onOpenKb }: Props) {
             </div>
           );
         })}
-        {items.length === 0 && <div className="empty">正在识别可清理的缓存目录…</div>}
         {items.length > 0 && shown.length === 0 && <div className="empty">没有匹配的缓存位置，试试清除筛选</div>}
       </div>
 

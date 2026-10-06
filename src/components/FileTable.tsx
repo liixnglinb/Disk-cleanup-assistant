@@ -51,6 +51,8 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
   const [needsAiOnly, setNeedsAiOnly] = useState(false);
   const [sort, setSort] = useState(initialFilter?.sort ?? "size_desc");
   const [keyword, setKeyword] = useState(initialFilter?.keyword ?? "");
+  // 关键字防抖：每按一键就查一次百万行表的 LIKE 会把后端和带宽都吃满
+  const [debouncedKeyword, setDebouncedKeyword] = useState(keyword);
   const [items, setItems] = useState<FileRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
@@ -60,7 +62,7 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   // 虚拟滚动的位置状态已移入 DataTable；这里只保留"重置滚动"的触发信号：
   // 筛选/盘符/翻页后列表要回到顶部，否则用户会停在新结果的中间位置。
-  const resetScrollKey = `${scanId}|${page}|${category}|${sort}|${keyword}|${recommendation}|${largeOnly}|${needsAiOnly}`;
+  const resetScrollKey = `${scanId}|${page}|${category}|${sort}|${debouncedKeyword}|${recommendation}|${largeOnly}|${needsAiOnly}`;
   const toast = useToast();
   // 设置：大文件阈值 / 自动预览 / 已 AI 分析标记（会话内避免重复标“存疑”）
   const settings = useSettings();
@@ -110,7 +112,7 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
       const r = await api.queryFiles({
         scan_id: scanId,
         category: category || undefined,
-        keyword: keyword || undefined,
+        keyword: debouncedKeyword || undefined,
         sort,
         recommendation: recommendation || undefined,
         min_size: largeOnly ? largeBytes : 0,
@@ -127,13 +129,18 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
     } finally {
       if (version === requestVersion.current) setLoading(false);
     }
-  }, [scanId, category, keyword, sort, recommendation, largeOnly, needsAiOnly, largeBytes]);
+  }, [scanId, category, debouncedKeyword, sort, recommendation, largeOnly, needsAiOnly, largeBytes]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedKeyword(keyword), 300);
+    return () => clearTimeout(t);
+  }, [keyword]);
 
   useEffect(() => {
     setItems([]);
     setTotal(0);
     if (scanId) load(0);
-  }, [scanId, category, sort, keyword, recommendation, largeOnly, needsAiOnly, load]);
+  }, [scanId, category, sort, debouncedKeyword, recommendation, largeOnly, needsAiOnly, load]);
 
   // 分页窗口：总页数由服务端返回的 total 决定，翻页是替换当前页。
   const pageCount = Math.max(1, Math.ceil(total / PAGE));
@@ -324,7 +331,7 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
             <option value="mtime_desc">修改时间 ↓</option>
             <option value="path_asc">路径</option>
           </select>
-          <input className="search" placeholder="搜索路径 / 用途 / 软件…" value={keyword} onChange={(e) => setKeyword(e.target.value)} />
+          <input className="search" aria-label="按路径、用途或所属软件搜索文件" placeholder="路径 / 用途 / 软件…" value={keyword} onChange={(e) => setKeyword(e.target.value)} />
           <label className="option-line" style={{ margin: 0, minWidth: 110 }}>
             <input type="checkbox" checked={largeOnly} onChange={(e) => setLargeOnly(e.target.checked)} />
             <span className="muted" style={{ fontSize: 12 }}>仅看 &gt;{settings.largeFileMb}MiB</span>
@@ -340,7 +347,8 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
           <button className="btn small" onClick={selectAllFiltered} disabled={selectBusy || !scanId} title="全选当前筛选结果的全部文件（不区分大小页）">
             {selectBusy ? "选取中…" : "全选筛选结果"}
           </button>
-          <button className="btn small ghost" onClick={clearSelection} disabled={!someSelected}>清空</button>
+          {/* 与底部栏「取消选择」是同一个动作，工具栏再来一个"清空"只会让人
+              分不清是清筛选还是清勾选（旁边就有一个真的「清除筛选」）。 */}
           <span className="toolbar-total">{total.toLocaleString()} 个文件</span>
           <div className="toolbar-spacer" />
           <button className="btn small" onClick={analyzeBatch} disabled={aiBusy || !scanId} title="对扫描出的存疑文件批量调用 AI 分析（只传元信息）">
@@ -356,6 +364,8 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
         </div>
         {aiBusy && <div className="ai-progress"><i /></div>}
         {aiError && <div className="notice error" style={{ margin: "8px 0 0" }}>{aiError}</div>}
+        {/* 查询失败必须说出来：否则只剩空表 + "请先完成扫描"，把后端故障谎报成没数据 */}
+        {loadError && <div className="notice error" role="alert" style={{ margin: "8px 0 0" }}>文件列表读取失败：{loadError}</div>}
       </div>
 
       <DataTable
@@ -491,7 +501,8 @@ export default function FileTable({ initialFilter, onFilterChange }: Props) {
           <Icon name="chevron-left" size={13} /> 上一页
         </button>
         <span className="pager-pos" aria-live="polite">
-          {total ? `第 ${page + 1} / ${pageCount} 页` : "无匹配文件"} · 本页 {items.length} 条 · 共 {total.toLocaleString()} 条
+          {/* 一行只用一个「·」分隔：第二个改用逗号 —— 中间点当万能分隔符是套皮模板味 */}
+          {total ? `第 ${page + 1} / ${pageCount} 页` : "无匹配文件"} · 本页 {items.length} 条，共 {total.toLocaleString()} 条
           {pageCount > 1 && <span className="pager-hint">（← → 键翻页）</span>}
         </span>
         <button className="btn small" onClick={() => goTo(page + 1)} disabled={loading || page >= pageCount - 1}>

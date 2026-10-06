@@ -57,6 +57,13 @@
   --primary: #6366F1;
   --primary-hover: #4F46E5;
   --primary-soft: #EEF2FF;
+  /* 实心主色面（主 CTA / 选中勾选框）专用三色 —— 与 --primary 分开是有意的：
+     白字压在 #6366F1 上只有 4.47:1，差 0.03 不达 WCAG AA 4.5；压到 #4F46E5 才有
+     6.29:1。导航激活文字同理，#6366F1 落在 #EEF2FF 上只有 3.99:1。
+     需要"能承载文字的主色面"时一律用这三个，不要用 --primary 现拼。 */
+  --primary-cta: #4F46E5;
+  --primary-cta-hover: #4338CA;
+  --on-primary-cta: #FFFFFF;
   --primary-grad: linear-gradient(135deg, #818CF8 0%, #4F46E5 100%);
   --accent: #6366F1;
   --accent-soft: #EEF2FF;
@@ -69,6 +76,13 @@
   --danger: #EF4444;
   --danger-hover: #DC2626;
   --danger-soft: #FEE2E2;
+  /* #EF4444 直接当 13px 小字只有 3.76:1（白底）/ 3.42:1（#F4F4F4 底），
+     不达 AA 4.5。红色小字一律用 --danger-ink；--danger 留给描边与圆点。
+     实心红底另配一对：白字压 #EF4444 同样只有 3.76，压到 #DC2626 才 4.83。 */
+  --danger-ink: #B91C1C;
+  --danger-cta: #DC2626;
+  --danger-cta-hover: #B91C1C;
+  --on-danger-cta: #FFFFFF;
   --info: #6366F1;
   --info-soft: #EEF2FF;
 
@@ -194,6 +208,12 @@
   --primary: #818CF8;
   --primary-hover: #6366F1;
   --primary-soft: rgba(99, 102, 241, 0.15);
+  /* 暗色下实心面要往"更亮 + 深色前景"走，而不是沿用浅色的深紫：
+     #818CF8 底 + #14151A 字 = 6.11:1；悬停再提亮到 #A5A0FF = 7.88:1。
+     若按浅色那套压深（#6366F1 底 + 深色字）只有 4.08:1，反而不达标。 */
+  --primary-cta: #818CF8;
+  --primary-cta-hover: #A5A0FF;
+  --on-primary-cta: #14151A;
   --primary-grad: linear-gradient(135deg, #818CF8 0%, #4F46E5 100%);
   --accent: #818CF8;
   --accent-soft: rgba(99, 102, 241, 0.15);
@@ -205,6 +225,13 @@
   --danger: #F87171;
   --danger-hover: #EF4444;
   --danger-soft: rgba(239, 68, 68, 0.15);
+  /* 暗色的红色小字要提亮才够对比（#FCA5A5 压 #1E1E1E = 8.78:1）；
+     但同一支提亮红不能当实心底 —— 白字压 #FCA5A5 只有 2.31:1。
+     所以暗色的实心红反而压深到 #B91C1C，白字 6.47:1。 */
+  --danger-ink: #FCA5A5;
+  --danger-cta: #B91C1C;
+  --danger-cta-hover: #991B1B;
+  --on-danger-cta: #FFFFFF;
   --info: #818CF8;
   --info-soft: rgba(99, 102, 241, 0.15);
 

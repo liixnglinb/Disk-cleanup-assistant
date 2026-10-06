@@ -17,23 +17,70 @@ function backendToken(): string | null {
   return window.dca?.getApiToken() || new URLSearchParams(window.location.search).get("apiToken");
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+/** 后端挂起时不能把 UI 永久吊住：所有请求都有超时。
+ *  默认 60s（全盘扫描后 240 万行的统计/查询确实慢），个别调用可自己放宽。 */
+const DEFAULT_TIMEOUT_MS = 60000;
+
+function authHeaders(init?: RequestInit & { timeoutMs?: number }): { headers: Headers; timeoutMs: number } {
   const token = backendToken();
   const headers = new Headers(init?.headers);
   if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   if (token) headers.set("X-DCA-Token", token);
-  const res = await fetch(`${backendBase()}${path}`, { ...init, headers });
-  if (!res.ok) {
-    let detail = res.statusText;
-    try {
-      const body = await res.json();
-      detail = body.detail || detail;
-    } catch {
-      /* ignore */
-    }
-    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+  return { headers, timeoutMs: init?.timeoutMs ?? DEFAULT_TIMEOUT_MS };
+}
+
+async function throwHttp(res: Response): Promise<never> {
+  let detail: unknown = res.statusText;
+  try {
+    const body = await res.json();
+    detail = body.detail || detail;
+  } catch {
+    /* 非 JSON 错误体就用状态文本 */
   }
+  throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+}
+
+async function request<T>(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<T> {
+  const { headers, timeoutMs } = authHeaders(init);
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
+  let res: Response;
+  try {
+    res = await fetch(`${backendBase()}${path}`, { ...init, headers, signal: ctl.signal });
+  } catch (e) {
+    throw new Error(e instanceof Error && e.name === "AbortError" ? `请求超时（${Math.round(timeoutMs / 1000)}s 未响应）` : String(e instanceof Error ? e.message : e));
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!res.ok) await throwHttp(res);
   return res.json() as Promise<T>;
+}
+
+/** 下载型端点（CSV 导出）：必须带鉴权头，所以不能再用 window.open 裸 GET。 */
+async function downloadFile(path: string, filename: string): Promise<void> {
+  const { headers, timeoutMs } = authHeaders();
+  headers.delete("Content-Type");
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
+  let res: Response;
+  try {
+    res = await fetch(`${backendBase()}${path}`, { headers, signal: ctl.signal });
+  } catch (e) {
+    throw new Error(e instanceof Error && e.name === "AbortError" ? "导出超时" : String(e instanceof Error ? e.message : e));
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!res.ok) await throwHttp(res);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // 立刻 revoke 会让部分 Chromium 版本丢掉下载，延后一拍再释放。
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
 export interface FileQueryPayload {
@@ -129,6 +176,7 @@ export const api = {
     }),
   duplicates: (scanId: string) => request<DuplicateResult>(`/api/duplicates/find/${scanId}`),
   logs: () => request<{ items: LogEntry[]; total: number }>("/api/logs"),
+  exportLogs: () => downloadFile("/api/logs/export", `磁盘清理助手-删除记录-${new Date().toISOString().slice(0, 10)}.csv`),
   tools: () => request<{ items: ToolMeta[]; count: number }>("/api/tools"),
   aiConfig: () => request<AiConfig>("/api/ai/config"),
   aiPresets: () => request<{ items: AiPreset[] }>("/api/ai/presets"),

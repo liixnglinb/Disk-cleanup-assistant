@@ -84,7 +84,8 @@ export default function KnowledgePanel() {
       <div className="toolbar kb-toolbar">
         <input
           className="search"
-          placeholder="搜索目录名 / 所属软件 / 用途…"
+          aria-label="按目录名、所属软件或用途搜索目录百科"
+            placeholder="目录名 / 所属软件 / 用途…"
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
         />
@@ -176,7 +177,12 @@ export default function KnowledgePanel() {
                   <button
                     className="btn-mini-icon"
                     title="在资源管理器中打开该位置"
-                    onClick={() => api.reveal(it.resolved_path || it.path).catch(() => {})}
+                    onClick={() => {
+                      // 此前是 .catch(() => {})：点了没反应也不说为什么，
+                      // 与 FileTable / CachePanel 同操作会提示的行为不一致
+                      api.reveal(it.resolved_path || it.path)
+                        .catch((e) => setError("打开位置失败：" + String(e instanceof Error ? e.message : e)));
+                    }}
                   >
                     <Icon name="folder" size={13} />
                   </button>

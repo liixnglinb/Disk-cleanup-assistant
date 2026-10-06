@@ -1,7 +1,7 @@
 {
   "name": "disk-cleanup-assistant",
   "productName": "磁盘清理助手",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "description": "Windows 磁盘清理助手（Electron + FastAPI）",
   "author": "local-tools",
   "private": true,
@@ -63,6 +63,7 @@
       "target": [
         "nsis"
       ],
+      "publisherName": "local-tools",
       "artifactName": "DiskCleanup-Setup-${version}.${ext}",
       "icon": "build/icons/icon.ico"
     },

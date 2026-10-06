@@ -63,7 +63,12 @@ async function startBackend(apiToken) {
   child.on("error", (err) => {
     console.error("backend spawn error", err);
   });
-  const okPort = await waitHealth(port);
+  const okPort = await waitHealth(port).catch((err) => {
+    // 健康检查超时后子进程还活着：不杀掉就会留下占着端口的僵尸后端，
+    // 主进程随后回退到硬编码端口并拿到空 token。
+    try { child.kill(); } catch (_) { /* 已退出 */ }
+    throw err;
+  });
   return { child, port: okPort, apiToken };
 }
 

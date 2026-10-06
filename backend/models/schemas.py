@@ -17,13 +17,13 @@ class FileQuery(BaseModel):
     scan_id: str
     category: Optional[str] = None
     min_size: int = 0
-    keyword: Optional[str] = None
+    keyword: Optional[str] = Field(default=None, max_length=100)
     only_locked: Optional[bool] = None
     recommendation: Optional[str] = None
     ext: Optional[str] = None
     owner: Optional[str] = None
     needs_ai: Optional[bool] = None
-    page: int = 0
+    page: int = Field(default=0, ge=0, le=100000)
     page_size: int = Field(default=200, ge=1, le=1000)
     sort: str = "size_desc"
 

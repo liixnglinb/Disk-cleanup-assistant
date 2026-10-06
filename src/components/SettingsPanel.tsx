@@ -116,7 +116,7 @@ export default function SettingsPanel() {
                 label="深色模式"
                 desc="开启后切换为深色界面；关闭后使用浅色界面。"
               />
-              <Toggle on={settings.autoPreview} onChange={(v) => set({ autoPreview: v })} label="文件列表自动预览" desc="在文件列表展示用途、所属软件与删除建议。" />
+              <Toggle on={settings.autoPreview} onChange={(v) => set({ autoPreview: v })} label="文件列表自动预览" desc="在文件列表显示「用途 / 所属软件 / 删除建议」三列；关闭只是收起列，不影响扫描时的分析。" />
               <Toggle on={settings.showSafeCleanHint} onChange={(v) => set({ showSafeCleanHint: v })} label="清理前安全提示" desc="每次执行删除前显示安全与风险提示。" />
             </>
           )}
@@ -140,7 +140,8 @@ export default function SettingsPanel() {
                   />
                 </div>
               </div>
-              <Toggle on={settings.autoPreview} onChange={(v) => set({ autoPreview: v })} label="深度解析文件用途" desc="为每个文件分析用途、所属软件和删除建议（默认开启）。" />
+              {/* 与「通用 → 文件列表自动预览」是同一个开关，两处并排会让用户以为
+                  能分别控制（拨一个另一个跟着跳）。只留通用那一处。 */}
             </>
           )}
           {GROUPS.has("ai") && (
@@ -169,7 +170,7 @@ export default function SettingsPanel() {
                   <div className="setting-desc">OpenAI 兼容的 chat/completions 接口地址。</div>
                 </div>
                 <div className="setting-control" style={{ width: 360 }}>
-                  <input type="text" style={{ width: "100%" }} value={aiEndpoint}
+                  <input type="text" aria-label="API 端点" style={{ width: "100%" }} value={aiEndpoint}
                     onChange={(e) => setAiEndpoint(e.target.value)}
                     placeholder="https://api.openai.com/v1/chat/completions" />
                 </div>
@@ -182,7 +183,7 @@ export default function SettingsPanel() {
                   <div className="setting-desc">用于文件用途分析的模型名称。</div>
                 </div>
                 <div className="setting-control" style={{ width: 240 }}>
-                  <input type="text" style={{ width: "100%" }} value={aiModel}
+                  <input type="text" aria-label="模型名" style={{ width: "100%" }} value={aiModel}
                     onChange={(e) => setAiModel(e.target.value)} placeholder="gpt-4o-mini" />
                 </div>
               </div>
@@ -197,7 +198,7 @@ export default function SettingsPanel() {
                   </div>
                 </div>
                 <div className="setting-control" style={{ width: 280 }}>
-                  <input type="text" style={{ width: "100%" }} value={aiKey}
+                  <input type="text" aria-label="API Key" style={{ width: "100%" }} value={aiKey}
                     onChange={(e) => setAiKey(e.target.value)} placeholder="留空则保持现有 Key 不变" />
                 </div>
               </div>

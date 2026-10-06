@@ -34,7 +34,9 @@ type SortOrder = "size_desc" | "size_asc";
 export default function SoftwarePanel() {
   const [items, setItems] = useState<SoftwareItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [drive, setDrive] = useState<"all" | "C:" | "D:">("all");
+  // 盘符是运行时枚举出来的（E: / F: / U: 都可能），不能写死成 C: | D: ——
+  // 那样只能靠 setDrive(d as any) 绕过类型系统。
+  const [drive, setDrive] = useState<"all" | `${string}:`>("all");
   const [idleOnly, setIdleOnly] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [sortOrder, setSortOrder] = useState<SortOrder>("size_desc");
@@ -81,13 +83,15 @@ export default function SoftwarePanel() {
     }
   }, [items]);
 
-  const drives = useMemo(() => {
+  const drives = useMemo<`${string}:`[]>(() => {
     const map: Record<string, number> = {};
     for (const it of items) {
       const d = it.drive || "C:";
       map[d] = (map[d] || 0) + 1;
     }
-    return Object.keys(map).sort();
+    // 键来自 it.drive，运行时确实是 "X:" 形态；断言只在这一处收口，
+    // 下游 setDrive(d) 就不再需要 as any。
+    return Object.keys(map).sort() as `${string}:`[];
   }, [items]);
 
   const shown = useMemo(() => {
@@ -174,7 +178,8 @@ export default function SoftwarePanel() {
             <Icon name="search" size={15} />
             <input
               type="text"
-              placeholder="搜索软件名 / 发布者…"
+              aria-label="按软件名或发布者搜索"
+              placeholder="软件名 / 发布者…"
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
             />
@@ -190,7 +195,7 @@ export default function SoftwarePanel() {
               全部 <span className="sw-count">{items.length}</span>
             </button>
             {drives.map((d) => (
-              <button key={d} className={`sw-drive-tab ${drive === d ? "active" : ""}`} onClick={() => setDrive(d as any)}>
+              <button key={d} className={`sw-drive-tab ${drive === d ? "active" : ""}`} onClick={() => setDrive(d)}>
                 {d}盘 <span className="sw-count">{items.filter((i) => (i.drive || "C:") === d).length}</span>
               </button>
             ))}

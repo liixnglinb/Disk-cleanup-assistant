@@ -30,10 +30,20 @@ class UninstallRequest(BaseModel):
 
 @router.post("/uninstall")
 def uninstall(payload: UninstallRequest):
-    """启动官方卸载程序（异步，用户在卸载向导中完成）。"""
-    if not payload.uninstall_string.strip():
+    """启动官方卸载程序（异步，用户在卸载向导中完成）。
+
+    这个接口等价于"以当前用户执行任意命令"，所以 uninstall_string 必须与
+    注册表登记的 UninstallString 逐字一致 —— 前端本来就是从列表里原样带回的，
+    正常流程不受影响；伪造的命令在这里被挡下。
+    """
+    s = payload.uninstall_string.strip()
+    if not s:
         raise HTTPException(status_code=400, detail="缺少卸载命令")
-    return software.launch_uninstall(payload.uninstall_string)
+    from ..core import software as _sw
+    allowed = {str(it.get("uninstall_string") or "").strip() for it in _sw.list_installed_software()}
+    if s not in allowed:
+        raise HTTPException(status_code=403, detail="卸载命令与注册表登记不一致，已拒绝执行")
+    return software.launch_uninstall(s)
 
 
 class ResidueRequest(BaseModel):
