@@ -61,6 +61,14 @@ _MIGRATE_COLS = [
 
 
 READ_BUSY_TIMEOUT_MS = 3000
+# 单次 IN 查询的变量数上限：每条路径最多 5 个变体，150 条 = 750 个占位符，
+# 稳在 SQLite 各版本默认下限（999）以内。
+_LOOKUP_CHUNK = 150
+
+
+def _chunks(items: List[str], size: int):
+    for i in range(0, len(items), size):
+        yield items[i:i + size]
 
 
 class ScanDbError(RuntimeError):
@@ -678,17 +686,37 @@ class ScanController:
             try:
                 conn = read_conn(s.db_path)
                 try:
-                    for p in wanted:
-                        if p in found:
-                            continue
-                        for variant in _path_variants(p):
-                            row = conn.execute(
-                                "SELECT is_locked FROM files WHERE path = ? COLLATE NOCASE LIMIT 1",
-                                (variant,),
-                            ).fetchone()
-                            if row is not None:
-                                found[p] = int(row[0] or 0)
-                                break
+                    pending = [p for p in wanted if p not in found]
+                    # ① 精确匹配：能走 path 的 UNIQUE 索引（BINARY 排序）
+                    for chunk in _chunks(pending, _LOOKUP_CHUNK):
+                        marks = [v for p in chunk for v in _path_variants(p)]
+                        rows = conn.execute(
+                            "SELECT path, is_locked FROM files WHERE path IN ({})".format(
+                                ",".join("?" * len(marks))), marks,
+                        ).fetchall()
+                        by_key = {r[0].lower(): int(r[1] or 0) for r in rows}
+                        for p in chunk:
+                            for v in _path_variants(p):
+                                if v.lower() in by_key:
+                                    found[p] = by_key[v.lower()]
+                                    break
+                    # ② 仍未命中的，只做一次大小写不敏感兜底。
+                    # COLLATE NOCASE 用不上索引 = 全表扫描；旧写法是"每条未命中
+                    # 路径 × 每个变体"各扫一遍，20 万行库里 500 条要 20 秒。
+                    pending = [p for p in wanted if p not in found]
+                    if pending:
+                        for chunk in _chunks(pending, _LOOKUP_CHUNK):
+                            marks = [v for p in chunk for v in _path_variants(p)]
+                            rows = conn.execute(
+                                "SELECT path, is_locked FROM files WHERE path COLLATE NOCASE IN ({})".format(
+                                    ",".join("?" * len(marks))), marks,
+                            ).fetchall()
+                            by_key = {r[0].lower(): int(r[1] or 0) for r in rows}
+                            for p in chunk:
+                                for v in _path_variants(p):
+                                    if v.lower() in by_key:
+                                        found[p] = by_key[v.lower()]
+                                        break
                 finally:
                     conn.close()
             except sqlite3.Error as exc:

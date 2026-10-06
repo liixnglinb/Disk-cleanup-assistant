@@ -16,6 +16,7 @@
 """
 import json
 import sqlite3
+import time
 import warnings
 from pathlib import Path
 
@@ -246,6 +247,59 @@ def test_delete_accepts_forward_slash_variant(seeded):
     target = seeded["a.txt"].replace("\\", "/")
     r = client.post("/api/delete/", json={"paths": [target], "permanent": True, "restore_point": False})
     assert r.status_code == 200, f"正斜杠变体被判不在册：{r.status_code} {r.text}"
+
+
+def test_delete_accepts_other_casing_variant(seeded):
+    """扫描库存的是 os.scandir 的原样大小写，大小写不同也必须在册（Windows 等价）。"""
+    target = seeded["a.txt"].upper()
+    r = client.post("/api/delete/", json={"paths": [target], "permanent": True, "restore_point": False})
+    assert r.status_code == 200, f"大小写变体被判不在册：{r.status_code} {r.text}"
+    assert [o["path"] for o in r.json()["ok"]] == [target]
+
+
+def test_verify_deletable_does_not_scan_per_path(tmp_path, monkeypatch):
+    """未命中路径的溯源必须是批量查询，不能每条各扫一遍全表。
+
+    files.path 的 UNIQUE 索引是 BINARY 排序，`WHERE path = ? COLLATE NOCASE`
+    用不上索引 = 全表扫描。旧写法（逐条 × 逐变体）在 20 万行库里把 500 条
+    不存在的路径判掉要 20 秒；界面表现为"点删除卡死"。
+    """
+    import backend.core.config as cfg_mod
+    from backend.core import scanner as sc
+
+    monkeypatch.setattr(cfg_mod, "log_dir", lambda: tmp_path)
+    monkeypatch.setattr(sc, "log_dir", lambda: tmp_path)
+    sid = "bench0000001"
+    db = tmp_path / "scans" / f"{sid}.db"
+    db.parent.mkdir(parents=True, exist_ok=True)
+    s = sc._Session(sid, "C:", db)
+    s.open_db()
+    n = 120000
+    with s.db_lock:
+        s.conn.executemany(
+            "INSERT OR IGNORE INTO files (path,size,is_locked) VALUES (?, ?, 0)",
+            [("C:\\bench\\d%d\\f%d.bin" % (i, i), i) for i in range(n)],
+        )
+        s.conn.commit()
+    s.conn.close()
+    sc.controller._sessions[sid] = s
+    try:
+        absent = ["Q:\\absent\\x%d.bin" % i for i in range(500)]
+        t0 = time.perf_counter()
+        nf, lk = sc.controller.verify_deletable(absent)
+        dt = time.perf_counter() - t0
+        assert len(nf) == 500 and not lk
+        assert dt < 1.0, f"500 条未命中路径耗时 {dt:.2f}s，说明溯源退化成逐条全表扫描"
+        # 同一批路径改成在册形式，必须同样快
+        present = ["C:\\bench\\d%d\\f%d.bin" % (i, i) for i in range(500)]
+        t0 = time.perf_counter()
+        nf2, _ = sc.controller.verify_deletable(present)
+        dt2 = time.perf_counter() - t0
+        assert not nf2 and dt2 < 1.0, f"在册路径判定耗时 {dt2:.2f}s"
+    finally:
+        live = sc.controller._sessions.pop(sid, None)
+        if live and live.conn:
+            live.conn.close()
 
 
 # ------------------------------------------------------- 11 中断扫描不得谎报完成
