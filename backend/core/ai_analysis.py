@@ -10,21 +10,35 @@
 - B 类：存疑未知文件（扫描时 needs_ai=1）→ 批量交 AI
 - C 类：用户手动选中的某个文件/文件夹 → 点「AI 分析此文件」单独交 AI
 """
+import ipaddress
 import json
 import os
 import re
 import subprocess
 import time
+import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import List, Optional
 
+from . import secure_store
 from .config import log_dir
 
 # ---------------------------------------------------------------------------
 # 配置存储（endpoint / api_key / model）
 # ---------------------------------------------------------------------------
-_CONFIG_PATH = Path(log_dir()) / "ai_config.json"
+def _config_path() -> Path:
+    """每次现算：log_dir() 支持 DISK_CLEANUP_LOG_DIR 覆盖，测试才能重定向。"""
+    return Path(log_dir()) / "ai_config.json"
+
+
+_CONFIG_VERSION = 1
+_MAX_ENDPOINT_LEN = 300
+
+# 预设主机名：set_config 里用户手填 endpoint 时，只有 HTTPS 公网地址能通过。
+# 白名单不是给预设用的（预设本来就是内置常量），而是让"自定义"这一项也要守规矩。
+_ALLOWED_SCHEMES = {"https"}
 
 # 供应商预设模板（OpenAI 兼容 chat/completions）——参考 ccSwitch 预设思路：
 # 选预设自动填充 endpoint + 默认模型，用户只需填 API Key
@@ -52,49 +66,170 @@ def list_presets() -> list:
     return [dict(p) for p in _PROVIDER_PRESETS]
 
 
-def _load_config() -> dict:
-    cfg = dict(_DEFAULTS)
+def _as_text(value, fallback: str = "") -> str:
+    """配置文件里任何字段都可能是 None / 数字 / 列表——一律降级而不是抛 TypeError。"""
+    if isinstance(value, str):
+        return value
+    if value is None or isinstance(value, (list, dict, bool)):
+        return fallback
+    return str(value)
+
+
+def _as_int(value, fallback: int) -> int:
     try:
-        if _CONFIG_PATH.exists():
-            with open(_CONFIG_PATH, "r", encoding="utf-8") as f:
-                saved = json.load(f)
+        n = int(value)
+    except (TypeError, ValueError):
+        return fallback
+    return n if 10 <= n <= 120 else fallback
+
+
+def validate_endpoint(endpoint) -> str:
+    """带 Key 的外呼目标校验。
+
+    以前 endpoint 完全由配置决定且不做校验，而请求固定带 Authorization: Bearer <key>：
+    任何一次配置写坏 / 诱导改填（http:// 明文降级、127.0.0.1、169.254.169.254
+    这类元数据地址）都会把密钥直接送到对端。规则：仅 HTTPS、必须有主机名、
+    禁止回环/私有/链路本地/保留地址与带凭据的 URL。
+    """
+    raw = _as_text(endpoint).strip()
+    if not raw:
+        raise ValueError("未配置 API 端点")
+    if len(raw) > _MAX_ENDPOINT_LEN:
+        raise ValueError("API 端点过长")
+    try:
+        parts = urllib.parse.urlsplit(raw)
+    except ValueError as exc:
+        raise ValueError("API 端点格式非法") from exc
+    if parts.scheme not in _ALLOWED_SCHEMES:
+        raise ValueError("API 端点必须是 https:// 地址")
+    if parts.username or parts.password:
+        raise ValueError("API 端点不能包含账号凭据")
+    host = (parts.hostname or "").strip()
+    if not host or parts.port not in (None, 443):
+        raise ValueError("API 端点主机非法")
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        ip = None
+    if ip is not None and (ip.is_loopback or ip.is_private or ip.is_link_local
+                            or ip.is_reserved or ip.is_multicast or ip.is_unspecified):
+        raise ValueError("API 端点不允许指向本机或内网地址")
+    if ip is None:
+        low = host.lower()
+        if low in ("localhost", "localhost.localdomain") or low.endswith(".local"):
+            raise ValueError("API 端点不允许指向本机地址")
+    return raw
+
+
+# 上游报错里可能回显请求头或带凭据的 URL，出界面之前一律遮掉
+_QUERY_REDACT_RE = re.compile(r"(?i)(https?://\S+)")
+_HEADER_CRED_RE = re.compile(
+    r"(?i)(authorization|bearer|api[_-]?key|x-api-key)\s*[:=]\s*\S+"
+)
+_INLINE_KEY_RE = re.compile(r"\bsk-[A-Za-z0-9._-]{3,}")
+
+
+def _safe_message(exc) -> str:
+    """把异常/上游响应压成一句可显示的话，并且不泄漏 Key、不泄漏完整请求目标。
+
+    上游 4xx 的 body 经常回显请求头；完整 URL 里也可能有 query 凭据。
+    """
+    text = exc if isinstance(exc, str) else (str(exc) or type(exc).__name__)
+    text = _HEADER_CRED_RE.sub(r"\1=<已隐藏>", text)
+    text = _INLINE_KEY_RE.sub("<已隐藏>", text)
+    text = _QUERY_REDACT_RE.sub("<地址已隐藏>", text)
+    return " ".join(text.split())[:160]
+
+
+def _load_raw() -> dict:
+    """读出磁盘上的原始配置；文件坏掉（半写入 / 非法 JSON）时不静默假装没配置。"""
+    path = _config_path()
+    try:
+        if path.exists():
+            saved = json.loads(path.read_text(encoding="utf-8"))
             if isinstance(saved, dict):
-                cfg.update(saved)
-    except Exception:
-        pass
+                return saved
+            return {"_corrupt": "配置不是对象"}
+    except (OSError, ValueError) as exc:
+        return {"_corrupt": str(exc)[:200]}
+    return {}
+
+
+def _load_config() -> dict:
+    """内部读取：已解密封、类型已归一。坏文件按默认值继续可用。"""
+    raw = _load_raw()
+    cfg = dict(_DEFAULTS)
+    cfg["endpoint"] = _as_text(raw.get("endpoint"), _DEFAULTS["endpoint"])
+    cfg["model"] = _as_text(raw.get("model"), _DEFAULTS["model"])
+    cfg["timeout_s"] = _as_int(raw.get("timeout_s"), _DEFAULTS["timeout_s"])
+    sealed = raw.get("api_key_enc")
+    key = secure_store.open_sealed(_as_text(sealed)) if sealed else _as_text(raw.get("api_key"))
+    cfg["api_key"] = key
+    cfg["_legacy_plaintext"] = bool(_as_text(raw.get("api_key")) and not sealed)
+    cfg["_corrupt"] = _as_text(raw.get("_corrupt"))
     return cfg
 
 
 def _save_config(cfg: dict) -> None:
-    try:
-        _CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with open(_CONFIG_PATH, "w", encoding="utf-8") as f:
-            json.dump(cfg, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
+    """原子写：先写临时文件再 os.replace，避免断电/强杀留下半份 JSON。
+
+    失败必须让调用方知道——以前异常被吞掉，用户按了"保存"却什么都没落盘。
+    """
+    key = _as_text(cfg.get("api_key"))
+    out = {
+        "v": _CONFIG_VERSION,
+        "endpoint": _as_text(cfg.get("endpoint")),
+        "model": _as_text(cfg.get("model")),
+        "timeout_s": _as_int(cfg.get("timeout_s"), _DEFAULTS["timeout_s"]),
+    }
+    if key:
+        sealed = secure_store.seal(key)
+        if secure_store.is_sealed(sealed):
+            out["api_key_enc"] = sealed
+        else:
+            # DPAPI 不可用时如实写明，不假装加密过
+            out["api_key"] = key
+            out["api_key_unsealed"] = True
+    path = _config_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(tmp, path)
 
 
 def get_config() -> dict:
     """返回配置状态；api_key 脱敏，只回传是否已配置。"""
     cfg = _load_config()
-    key = cfg.get("api_key", "")
-    return {
+    key = cfg.get("api_key") or ""
+    storage = "dpapi" if secure_store.available() else "plaintext"
+    if cfg.get("_legacy_plaintext"):
+        storage = "plaintext_legacy"
+    out = {
         "configured": bool(key and cfg.get("endpoint") and cfg.get("model")),
         "endpoint": cfg.get("endpoint", ""),
         "model": cfg.get("model", ""),
         "has_api_key": bool(key),
         "api_key_hint": (key[:4] + "****" + key[-4:]) if len(key) >= 8 else ("****" if key else ""),
+        "key_storage": storage,
     }
+    if cfg.get("_corrupt"):
+        out["config_warning"] = "AI 配置文件损坏，已按默认值继续；重新保存一次即可修复"
+    return out
 
 
 def set_config(endpoint: str, api_key: str, model: str, timeout_s: int = 30) -> dict:
-    """保存配置。api_key 为空时清除。"""
+    """保存配置。api_key 为空时清除。endpoint 当场校验，不合法直接拒绝。"""
     cfg = _load_config()
-    cfg["endpoint"] = endpoint.strip() or _DEFAULTS["endpoint"]
-    cfg["model"] = model.strip() or _DEFAULTS["model"]
-    cfg["timeout_s"] = max(10, min(120, int(timeout_s or 30)))
-    if api_key.strip():
-        cfg["api_key"] = api_key.strip()
+    cfg["endpoint"] = validate_endpoint(endpoint or _DEFAULTS["endpoint"])
+    cfg["model"] = _as_text(model).strip() or _DEFAULTS["model"]
+    cfg["timeout_s"] = _as_int(timeout_s, 30)
+    incoming = _as_text(api_key).strip()
+    # 界面回显的是脱敏 hint（形如 sk-x****3456）。带 **** 的提交是误传，
+    # 保留原 Key，而不是把脱敏串当真 Key 覆盖进去。
+    if incoming and "****" in incoming:
+        cfg["api_key"] = cfg.get("api_key", "")
+    elif incoming:
+        cfg["api_key"] = incoming
     else:
         cfg["api_key"] = ""
     _save_config(cfg)
@@ -110,9 +245,15 @@ def test_connection(endpoint: str, api_key: str, model: str, timeout_s: int = 15
     cfg = _load_config()
     endpoint = (endpoint or "").strip() or cfg.get("endpoint", "")
     api_key = (api_key or "").strip() or cfg.get("api_key", "")
+    if api_key and "****" in api_key:
+        api_key = cfg.get("api_key", "")
     model = (model or "").strip() or cfg.get("model", "")
     if not endpoint:
         return {"ok": False, "message": "请先填写 API 端点"}
+    try:
+        endpoint = validate_endpoint(endpoint)
+    except ValueError as exc:
+        return {"ok": False, "message": f"API 端点不可用：{exc}"}
     if not api_key:
         return {"ok": False, "message": "请先填写 API Key"}
     if not model:
@@ -139,15 +280,15 @@ def test_connection(endpoint: str, api_key: str, model: str, timeout_s: int = 15
         latency = int((time.time() - t0) * 1000)
         return {"ok": True, "latency_ms": latency, "message": f"连接成功 · {latency}ms"}
     except urllib.error.HTTPError as exc:
-        # 尝试读取错误详情
+        # 上游错误体可能回显请求头，先做凭据脱敏再给界面
         detail = ""
         try:
             detail = exc.read().decode("utf-8", "replace")[:200]
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
-        return {"ok": False, "message": f"HTTP {exc.code}：{detail or exc.reason}"}
+        return {"ok": False, "message": f"HTTP {exc.code}：{_safe_message(detail or str(exc.reason))}"}
     except Exception as exc:  # noqa: BLE001
-        return {"ok": False, "message": f"连接失败：{exc}"}
+        return {"ok": False, "message": f"连接失败：{_safe_message(exc)}"}
 
 
 # ---------------------------------------------------------------------------
@@ -238,6 +379,8 @@ def _call_llm(metas: List[dict]) -> dict:
     cfg = _load_config()
     if not (cfg.get("api_key") and cfg.get("endpoint") and cfg.get("model")):
         raise RuntimeError("AI 未配置：请在设置中填写 API 端点、Key 与模型")
+    # 配置文件可能被外部改写过，出钱出 Key 的那一次调用要自己再校验一遍
+    endpoint = validate_endpoint(cfg["endpoint"])
 
     user_prompt = json.dumps({"files": metas}, ensure_ascii=False, indent=2)
     payload = {
@@ -249,7 +392,7 @@ def _call_llm(metas: List[dict]) -> dict:
         "temperature": 0.1,
     }
     req = urllib.request.Request(
-        cfg["endpoint"],
+        endpoint,
         data=json.dumps(payload).encode("utf-8"),
         headers={
             "Content-Type": "application/json",
@@ -291,4 +434,4 @@ def analyze_paths(paths: List[str], with_signature: bool = False) -> dict:
         result = _call_llm(metas)
         return {"ok": True, "items": result.get("files", []), "analyzed": len(metas)}
     except Exception as exc:  # noqa: BLE001
-        return {"ok": False, "message": str(exc), "items": []}
+        return {"ok": False, "message": _safe_message(exc), "items": []}

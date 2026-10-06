@@ -1,10 +1,11 @@
 """重复文件检测：先按大小分组，同大小文件算 MD5，确认内容完全相同后列出。"""
 import hashlib
 import os
-import sqlite3
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Optional
+
+from .scanner import read_conn
 
 BATCH = 256
 
@@ -28,7 +29,7 @@ def find_duplicates(db_path: str, progress=None) -> List[dict]:
 
     返回：[{size, files:[{path, mtime}], total_bytes}]
     """
-    conn = sqlite3.connect(db_path)
+    conn = read_conn(db_path)
     try:
         rows = conn.execute(
             "SELECT id, path, size, mtime FROM files WHERE size > 0 AND is_locked = 0 AND is_dir = 0"

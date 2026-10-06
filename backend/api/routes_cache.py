@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException
 
 from ..core.cache_dirs import cache_overview, candidate_cache_dirs, dir_size_bytes
 from ..core.delete_manager import create_restore_point, permanent_delete, recycle
-from ..core.scanner import controller as scan_controller
+from ..core.scanner import ScanDbError, controller as scan_controller
 from ..models.schemas import CacheCleanRequest
 
 router = APIRouter(prefix="/api/cache", tags=["cache"])
@@ -16,7 +16,11 @@ def _reject_unknown_cache_paths(paths):
     随手构造的路径。缓存候选本身不在扫描库里，所以白名单来自服务端固定列表，
     而不是信任调用方。
     """
-    not_found, locked = scan_controller.verify_deletable(paths)
+    try:
+        not_found, locked = scan_controller.verify_deletable(paths)
+    except ScanDbError:
+        # 扫描库读不到时，缓存候选白名单这一路仍然有效，不能因为溯源失败就拒绝。
+        not_found, locked = list(paths), []
     if locked:
         return [f"{p}（扫描时被标记为系统锁定，拒绝删除）" for p in locked]
     if not not_found:
@@ -72,3 +76,5 @@ def clean(payload: CacheCleanRequest):
         return result
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc))
+    except OSError as exc:
+        raise HTTPException(status_code=400, detail=f"清理失败：{exc.strerror or exc}")

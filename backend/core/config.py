@@ -1,6 +1,7 @@
 """全局配置：端口、保护目录白名单、扫描默认参数。"""
 import os
 import socket
+import threading
 from pathlib import Path
 from typing import List
 
@@ -53,9 +54,33 @@ PROTECTED_RELATIVE: List[str] = [
 ]
 
 
+DRIVE_PROBE_TIMEOUT_S = 1.0
+
+
+def _drive_present(letter: str) -> bool:
+    """判断盘符存在，且绝不能把接口吊死。
+
+    os.path.exists("Z:\\") 对已断开映射的网络盘会走到系统重连逻辑，单盘能卡
+    十几秒；26 个字母挨个卡过去，/api/drives 就没法用了。放到线程里限时等。
+    """
+    box: List[bool] = []
+    target = f"{letter}:\\"
+
+    def _check() -> None:
+        try:
+            box.append(os.path.exists(target))
+        except OSError:
+            box.append(False)
+
+    t = threading.Thread(target=_check, daemon=True, name=f"drive-{letter}")
+    t.start()
+    t.join(DRIVE_PROBE_TIMEOUT_S)
+    return bool(box and box[0])
+
+
 def available_drives() -> List[str]:
     """返回当前存在的盘符，如 ['C:', 'D:']。"""
-    return [f"{d}:" for d in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" if os.path.exists(f"{d}:\\")]
+    return [f"{d}:" for d in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" if _drive_present(d)]
 
 
 def protected_absolute_paths() -> List[str]:

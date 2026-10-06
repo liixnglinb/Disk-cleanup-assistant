@@ -3,16 +3,22 @@ from fastapi import APIRouter, HTTPException
 
 from ..core.scanner import controller
 from ..models.schemas import FileQuery
+from ._guards import guard_db
 
 router = APIRouter(prefix="/api/files", tags=["files"])
+
+
+def _exists(scan_id: str) -> bool:
+    return guard_db(controller.status, scan_id) is not None
 
 
 @router.post("/query")
 def query_files(payload: FileQuery):
     """分页查询，前端虚拟滚动分批拉取。sort=size_desc 时大文件标红依据。"""
-    if controller.status(payload.scan_id) is None:
+    if not _exists(payload.scan_id):
         raise HTTPException(status_code=404, detail="扫描不存在")
-    return controller.query(
+    return guard_db(
+        controller.query,
         scan_id=payload.scan_id,
         category=payload.category,
         min_size=payload.min_size,
@@ -31,9 +37,10 @@ def query_files(payload: FileQuery):
 @router.post("/select-all")
 def select_all(payload: FileQuery):
     """按当前筛选返回全部匹配且非锁定的 path，供前端一键全选。"""
-    if controller.status(payload.scan_id) is None:
+    if not _exists(payload.scan_id):
         raise HTTPException(status_code=404, detail="扫描不存在")
-    paths = controller.query_paths(
+    paths = guard_db(
+        controller.query_paths,
         scan_id=payload.scan_id,
         category=payload.category,
         min_size=payload.min_size,
@@ -50,7 +57,7 @@ def select_all(payload: FileQuery):
 
 @router.get("/statistics/{scan_id}")
 def statistics(scan_id: str):
-    st = controller.statistics(scan_id)
+    st = guard_db(controller.statistics, scan_id)
     if st is None:
         raise HTTPException(status_code=404, detail="扫描不存在")
     return st

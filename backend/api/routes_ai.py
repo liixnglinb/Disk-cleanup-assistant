@@ -1,8 +1,8 @@
 """AI 辅助分析 API（元信息分析，不传文件本体）。"""
 from typing import List
 
-from fastapi import APIRouter
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 
 from ..core import ai_analysis
 
@@ -10,15 +10,15 @@ router = APIRouter(prefix="/api/ai", tags=["ai"])
 
 
 class AnalyzeRequest(BaseModel):
-    paths: List[str]
+    paths: List[str] = Field(..., min_length=1, max_length=200)
     with_signature: bool = False
 
 
 class ConfigRequest(BaseModel):
-    endpoint: str = ""
-    api_key: str = ""
-    model: str = ""
-    timeout_s: int = 30
+    endpoint: str = Field(default="", max_length=400)
+    api_key: str = Field(default="", max_length=400)
+    model: str = Field(default="", max_length=200)
+    timeout_s: int = Field(default=30, ge=10, le=120)
 
 
 @router.get("/config")
@@ -34,9 +34,16 @@ def presets():
 
 @router.post("/config")
 def set_config(payload: ConfigRequest):
-    return ai_analysis.set_config(
-        payload.endpoint, payload.api_key, payload.model, payload.timeout_s
-    )
+    # endpoint 校验不过、或配置文件写不下去，都必须让界面看到失败，
+    # 而不是显示"已保存"（旧实现把异常全吞了，Key 根本没落盘）。
+    try:
+        return ai_analysis.set_config(
+            payload.endpoint, payload.api_key, payload.model, payload.timeout_s
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"配置保存失败：{exc.strerror or exc}")
 
 
 @router.post("/test")

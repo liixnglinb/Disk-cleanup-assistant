@@ -7,6 +7,7 @@
     python scripts/run_dev.py
 """
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi import Request
@@ -19,19 +20,34 @@ from .api import routes_system
 from .core.config import APP_NAME
 from .platform import platform, router as tools_router, setup_tools
 
-app = FastAPI(title="磁盘清理助手", version=__version__)
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """启动清库存 + 退出时收尾。
 
-@app.on_event("startup")
-def _housekeeping():
-    """启动时清理过期扫描库：scans/*.db 每个可达数百 MB，此前只增不减。"""
+    on_event 已废弃，未来 FastAPI 移除它就是导入期崩溃（30 秒空白窗口）；
+    另外此前根本没有 shutdown：扫描线程与库连接随进程硬切。
+    """
+    from .core.scanner import controller as _scan_controller
     try:
-        from .core.scanner import controller as _scan_controller
         _scan_controller.prune_old_scans()
     except Exception:  # noqa: BLE001 清理失败不阻断启动
         pass
+    yield
+    try:
+        _scan_controller.shutdown()
+    except Exception:  # noqa: BLE001 退出的尽力而为不能反过来卡退出
+        pass
+
+
+app = FastAPI(title="磁盘清理助手", version=__version__, lifespan=lifespan)
 
 _api_token = os.environ.get('DCA_API_TOKEN', '').strip()
+
+# Electron 加载本仓库文件用的源：file:// 与 null 是打包/开发下的两种形态。
+# 通配符 allow_headers=["*"] 在有凭据的 CORS 里语义宽松得没必要，收成实际用到的。
+_ALLOWED_ORIGINS = ["file://", "null"]
+_ALLOWED_HEADERS = ["content-type", "x-dca-token"]
 
 
 @app.middleware('http')
@@ -45,11 +61,12 @@ async def require_local_api_token(request: Request, call_next):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["file://", "null"],
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # Electron 生产环境从 file:// 加载页面（打包后无 origin），开发模式是
+    # http://localhost:< vite 端口>。这里收紧到这两类，其他源一律不带凭据放行。
+    allow_origin_regex=r"^(file://|null|http://(localhost|127\.0\.0\.1)(:\d+)?)$",
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["x-dca-token", "content-type"],
 )
 
 # Tool-agnostic system helpers (drives / config) usable by any tool
@@ -65,7 +82,11 @@ _health = {
     "app": "local-toolbox",
     "version": __version__,
     "tools": len(platform.manifests()),
+    # 实际挂上的端点数（不是 router 个数）：新 FastAPI 不在 app.routes 里展开
+    # 嵌套路由，只有递归数才看得出是不是真的装载齐了
     "routers": n,
+    # 装载失败的原因条数：不为 0 时界面/排查能立刻看出后端是半死的
+    "load_errors": len(platform.import_errors),
 }
 
 

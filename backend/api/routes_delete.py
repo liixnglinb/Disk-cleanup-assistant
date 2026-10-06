@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 from ..core.delete_manager import create_restore_point
 from ..core.delete_manager import permanent_delete as _permanent
 from ..core.delete_manager import recycle as _recycle
-from ..core.scanner import controller as scan_controller
+from ..core.scanner import ScanDbError, controller as scan_controller
 from ..models.schemas import DeleteFilesRequest
 
 router = APIRouter(prefix="/api/delete", tags=["delete"])
@@ -21,7 +21,11 @@ def delete_files(payload: DeleteFilesRequest):
     2. 用户勾选了"创建还原点"但创建失败时中止删除 —— 静默继续会让用户
        以为有后悔药，实际没有。
     """
-    not_found, locked = scan_controller.verify_deletable(payload.paths)
+    try:
+        not_found, locked = scan_controller.verify_deletable(payload.paths)
+    except ScanDbError as exc:
+        # 读不到扫描库时绝不能报 403"路径不合法"——那是把系统问题说成用户问题。
+        raise HTTPException(status_code=503, detail=str(exc))
     if not_found or locked:
         msgs = [f"{p}（不在任何扫描结果中，拒绝删除）" for p in not_found[:3]]
         msgs += [f"{p}（扫描时被标记为系统锁定，拒绝删除）" for p in locked[:3]]
@@ -50,3 +54,7 @@ def delete_files(payload: DeleteFilesRequest):
         return result
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc))
+    except OSError as exc:
+        # 目标在扫描之后被移动/重命名、路径含非法字符、卷已断开等，都是可预期
+        # 的 IO 失败：给用户一个原因，而不是一坨未处理异常。
+        raise HTTPException(status_code=400, detail=f"删除失败：{exc.strerror or exc}")

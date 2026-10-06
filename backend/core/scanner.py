@@ -60,6 +60,40 @@ _MIGRATE_COLS = [
 ]
 
 
+READ_BUSY_TIMEOUT_MS = 3000
+
+
+class ScanDbError(RuntimeError):
+    """扫描库读不到（忙/损坏）。这不是"路径不合法"，API 层必须回 503 而不是 403。"""
+
+
+def _path_variants(p: str) -> List[str]:
+    """一个路径在 SQLite 里可能被登记成的等价写法。
+
+    扫描器按 os.scandir 存反斜杠绝对路径，但界面/复制粘贴常给正斜杠；
+    Windows 比较时还会忽略尾随空格和点。不做归一化，真实删除会被误判"不在册"。
+    """
+    out: List[str] = []
+    stripped = p.strip()
+    trimmed = stripped.rstrip(" .") if len(stripped) > 2 else stripped
+    for cand in (p, stripped, stripped.replace("/", "\\"), trimmed, trimmed.replace("/", "\\")):
+        if cand and cand not in out:
+            out.append(cand)
+    return out
+
+
+def read_conn(db_path):
+    """历史扫描库的只读连接：显式短忙等。
+
+    sqlite3 默认 5s 忙等，扫描写入批次占锁时界面请求会先卡满 5 秒再把
+    OperationalError 逃逸成 500；界面只想知道"现在读不到，稍后再试"。
+    """
+    conn = sqlite3.connect(str(db_path), check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.execute(f"PRAGMA busy_timeout={READ_BUSY_TIMEOUT_MS}")
+    return conn
+
+
 def open_db_checked(db_path):
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path), check_same_thread=False)
@@ -200,12 +234,7 @@ class ScanController:
         with self._lock:
             self._sessions[scan_id] = session
         # 持久化 meta：后端重启后可从磁盘恢复本次扫描（不再丢结果）
-        try:
-            (log_dir() / "scans" / f"{scan_id}.json").write_text(
-                json.dumps({"drive": drive, "total_bytes": total_bytes, "drive_free": free_bytes}),
-                encoding="utf-8")
-        except OSError:
-            pass
+        self._write_meta(session, "running")
         session.open_db()
         session.thread = threading.Thread(
             target=self._run, args=(session,), daemon=True, name=f"scan-{scan_id}"
@@ -224,6 +253,22 @@ class ScanController:
                 batch,
             )
             session.conn.commit()
+
+    def _write_meta(self, session: "_Session", status: str) -> None:
+        """扫描元信息落盘（原子替换）。崩溃时留下的 running 会被恢复逻辑识别为中断。"""
+        try:
+            meta = log_dir() / "scans" / f"{session.scan_id}.json"
+            tmp = meta.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps({
+                "v": 1,
+                "drive": session.drive,
+                "total_bytes": session.stats.total_bytes,
+                "drive_free": session.stats.drive_free,
+                "status": status,
+            }), encoding="utf-8")
+            os.replace(tmp, meta)
+        except OSError:
+            pass
 
     def _run(self, session: _Session) -> None:
         matcher = ProtectedMatcher()
@@ -319,6 +364,9 @@ class ScanController:
             session.stats.message = str(exc)
         finally:
             session.stats.end_ms = int(time.time() * 1000)
+            # 终态必须落盘：进程被强杀时 meta 仍停在 running，重启后才知道
+            # 这份结果是半成品，不能当完整扫描喂给删除白名单。
+            self._write_meta(session, session.stats.status)
             if session.conn:
                 try:
                     session.conn.commit()
@@ -381,12 +429,17 @@ class ScanController:
             total_bytes = 0
             drive_free = 0
             meta = log_dir() / "scans" / f"{scan_id}.json"
+            meta_status = "completed"
             if meta.exists():
                 try:
                     m = json.loads(meta.read_text(encoding="utf-8"))
                     drive = m.get("drive", drive)
                     total_bytes = int(m.get("total_bytes", 0) or 0)
                     drive_free = int(m.get("drive_free", 0) or 0)
+                    # 只有带版本号的 meta 才记录了终态；老 meta 没有证据说它中断过，
+                    # 一律降级成 interrupted 会把用户所有历史扫描都打上警示。
+                    if m.get("v") == 1 and m.get("status") not in ("completed", "cancelled", "error"):
+                        meta_status = "interrupted"
                 except (OSError, ValueError):
                     pass
             session = _Session(scan_id, drive, db)
@@ -406,8 +459,8 @@ class ScanController:
                 except OSError:
                     pass
                 return None
-            session.stats.status = "completed"
-            session.stats.message = "restored"
+            session.stats.status = meta_status
+            session.stats.message = "restored" if meta_status == "completed" else "上次扫描未跑完，结果为半成品"
             session.stats.end_ms = int(db.stat().st_mtime * 1000)
             try:
                 row = session.conn.execute("SELECT COUNT(*), COALESCE(SUM(size),0) FROM files").fetchone()
@@ -499,8 +552,7 @@ class ScanController:
                               "WHEN 'keep' THEN 2 ELSE 3 END, size DESC, path ASC",
         }.get(sort, "size DESC, path ASC")
 
-        conn = sqlite3.connect(str(session.db_path))
-        conn.row_factory = sqlite3.Row
+        conn = read_conn(session.db_path)
         try:
             total = conn.execute(
                 "SELECT COUNT(*) AS c FROM files" + sql_where, params
@@ -563,8 +615,7 @@ class ScanController:
             "recommend_desc": "CASE recommendation WHEN 'recommend' THEN 0 WHEN 'caution' THEN 1 "
                               "WHEN 'keep' THEN 2 ELSE 3 END, size DESC, path ASC",
         }.get(sort, "size DESC, path ASC")
-        conn = sqlite3.connect(str(session.db_path))
-        conn.row_factory = sqlite3.Row
+        conn = read_conn(session.db_path)
         try:
             rows = conn.execute(
                 "SELECT path FROM files" + sql_where + f" ORDER BY {order} LIMIT {int(limit)}", params
@@ -577,7 +628,7 @@ class ScanController:
         session = self._get(scan_id)
         if not session or not session.db_path.exists():
             return None
-        conn = sqlite3.connect(str(session.db_path))
+        conn = read_conn(session.db_path)
         try:
             total_files, total_bytes = conn.execute(
                 "SELECT COUNT(*), COALESCE(SUM(size),0) FROM files"
@@ -617,7 +668,7 @@ class ScanController:
         """
         wanted = [p for p in (paths or []) if p]
         if not wanted:
-            return []
+            return [], []
         with self._lock:
             sessions = list(self._sessions.values())
         found: Dict[str, int] = {}
@@ -625,49 +676,97 @@ class ScanController:
             if not s.db_path.exists():
                 continue
             try:
-                conn = sqlite3.connect(str(s.db_path))
+                conn = read_conn(s.db_path)
                 try:
                     for p in wanted:
                         if p in found:
                             continue
-                        row = conn.execute(
-                            "SELECT is_locked FROM files WHERE path = ? COLLATE NOCASE LIMIT 1",
-                            (p,),
-                        ).fetchone()
-                        if row is not None:
-                            found[p] = int(row[0] or 0)
+                        for variant in _path_variants(p):
+                            row = conn.execute(
+                                "SELECT is_locked FROM files WHERE path = ? COLLATE NOCASE LIMIT 1",
+                                (variant,),
+                            ).fetchone()
+                            if row is not None:
+                                found[p] = int(row[0] or 0)
+                                break
                 finally:
                     conn.close()
-            except sqlite3.Error:
-                continue
+            except sqlite3.Error as exc:
+                # 读不了扫描库 ≠ 路径不合法。谎报 403 会让用户以为文件"不在册"，
+                # 真实原因是数据库忙/损坏，必须原样上抛由 API 层回 503。
+                raise ScanDbError(f"扫描数据库暂时不可读：{exc}") from exc
         not_found = [p for p in wanted if p not in found]
         locked = [p for p in wanted if found.get(p) == 1]
         return not_found, locked
+
+    def shutdown(self) -> None:
+        """进程退出前收尾：取消在跑的扫描、关库。尽力而为，不阻断退出。"""
+        with self._lock:
+            sessions = list(self._sessions.values())
+        for s in sessions:
+            try:
+                s.stats.status = "cancelled"
+                s.stats.message = "backend shutting down"
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                if s.conn:
+                    s.conn.commit()
+                    s.conn.close()
+                    s.conn = None
+            except Exception:  # noqa: BLE001
+                pass
+        with self._lock:
+            self._sessions.clear()
 
     def prune_old_scans(self, keep_days: int = 7) -> int:
         """公开入口：启动时清理过期扫描库（此前该逻辑存在但从未被调用）。"""
         return self._prune_old_scan_dbs(keep_days)
 
-    def _prune_old_scan_dbs(self, keep_days: int = 7) -> int:
-        """清理超过 keep_days 且不在活跃会话中的旧扫描库，防止磁盘堆积。"""
+    def _prune_old_scan_dbs(self, keep_days: int = 7, keep_exports: int = 5) -> int:
+        """清理过期扫描相关产物，防止磁盘堆积。
+
+        此前只删 *.db，孤儿 *.json meta、*.db.corrupt、WAL/SHM  sidecar 和
+        每次导出新增一份的 deletion_log_*.csv 永不回收 —— 用得越久越占盘。
+        """
         scans_dir = log_dir() / "scans"
-        if not scans_dir.exists():
-            return 0
-        with self._lock:
-            active = set(self._sessions.keys())
         removed = 0
         now = time.time()
+        with self._lock:
+            active = set(self._sessions.keys())
+        if scans_dir.exists():
+            try:
+                for f in scans_dir.iterdir():
+                    if not f.is_file():
+                        continue
+                    sid = f.name.split(".")[0]
+                    if sid in active:
+                        continue
+                    try:
+                        stale = now - f.stat().st_mtime > keep_days * 86400
+                        # 没有对应 .db 的 meta / 被隔离的损坏库都是纯垃圾，直接回收
+                        orphan = (
+                            f.suffix in (".json", ".corrupt", ".tmp")
+                            or f.name.endswith(("-wal", "-shm"))
+                        ) and not (scans_dir / f"{sid}.db").exists()
+                        if stale or orphan:
+                            f.unlink(missing_ok=True)
+                            removed += 1
+                    except OSError:
+                        pass
+            except OSError:
+                pass
+        # 导出 CSV：只留最近 keep_exports 份
         try:
-            for f in scans_dir.glob("*.db*"):
-                if f.suffix != ".db":
-                    continue
-                sid = f.stem
-                if sid in active:
-                    continue
+            logs = sorted(
+                (p for p in log_dir().glob("deletion_log_*.csv")),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+            for stale in logs[keep_exports:]:
                 try:
-                    if now - f.stat().st_mtime > keep_days * 86400:
-                        f.unlink(missing_ok=True)
-                        removed += 1
+                    stale.unlink(missing_ok=True)
+                    removed += 1
                 except OSError:
                     pass
         except OSError:

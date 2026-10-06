@@ -7,6 +7,7 @@
 4. 每次删除写入审计日志
 """
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -16,16 +17,37 @@ from .audit_log import log_deletion
 from .config import is_protected_path
 
 
-def create_restore_point(description: str = "本地工具箱删除前还原点") -> bool:
-    """尝试创建系统还原点（需管理员权限 + 系统保护已开启）。失败不影响删除。"""
+RESTORE_POINT_DEFAULT = "本地工具箱删除前还原点"
+# 还原点描述会进 PowerShell 命令。只放行安全字符集，越界一律用默认描述：
+# 描述本来来自代码常量，加白名单是防住以后有人把用户输入接进来。
+# 只放行字母数字（含中文）、空格与几个安全标点；; $ ` ( ) { } " 这类
+# PowerShell 元字符一律不进白名单，落回默认描述。单引号允许，靠翻倍转义。
+_DESC_ALLOWED = re.compile(r"^[\w \-.'()]{1,63}$")
+
+
+def _ps_single_quote(value: str) -> str:
+    """PowerShell 单引号字符串字面量：内部单引号翻倍转义。"""
+    return "'" + value.replace("'", "''") + "'"
+
+
+def build_restore_point_command(description: str = RESTORE_POINT_DEFAULT) -> str:
+    desc = description if _DESC_ALLOWED.match(description or "") else RESTORE_POINT_DEFAULT
+    return (
+        "Checkpoint-Computer -Description "
+        + _ps_single_quote(desc)
+        + " -RestorePointType MODIFY_SETTINGS"
+    )
+
+
+def create_restore_point(description: str = RESTORE_POINT_DEFAULT) -> bool:
+    """尝试创建系统还原点（需管理员权限 + 系统保护已开启）。失败不影响删除。
+
+    调用方（API 层）负责在用户明确勾了"创建还原点"时把失败当错误看待。
+    """
     try:
-        ps = (
-            "Checkpoint-Computer -Description "
-            + repr(description)
-            + " -RestorePointType MODIFY_SETTINGS"
-        )
         r = subprocess.run(
-            ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+             build_restore_point_command(description)],
             capture_output=True, timeout=25,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
