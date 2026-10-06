@@ -3,7 +3,6 @@
 <div align="center">
 
 [![Release](https://custom-icon-badges.demolab.com/github/v/release/liixnglinb/Disk-cleanup-assistant?style=flat-square&logo=tag&label=%E6%9C%80%E6%96%B0%E7%89%88&labelColor=0d1117&color=2da44e)](https://github.com/liixnglinb/Disk-cleanup-assistant/releases)
-[![License](https://custom-icon-badges.demolab.com/github/license/liixnglinb/Disk-cleanup-assistant?style=flat-square&logo=law&labelColor=0d1117&color=8250df)](LICENSE)
 [![Stars](https://custom-icon-badges.demolab.com/github/stars/liixnglinb/Disk-cleanup-assistant?style=flat-square&logo=star&labelColor=0d1117&color=f4a340)](https://github.com/liixnglinb/Disk-cleanup-assistant/stargazers)
 [![Last Commit](https://custom-icon-badges.demolab.com/github/last-commit/liixnglinb/Disk-cleanup-assistant?style=flat-square&logo=git&labelColor=0d1117&color=5898ff)](https://github.com/liixnglinb/Disk-cleanup-assistant/commits)
 
@@ -185,9 +184,13 @@ Electron 窗口（titleBarStyle: hidden + 系统绘制按钮 overlay，高 64px�
 全部失败时按默认顺序回退。详见「自动更新」一节。
 
 ## 运行（开发）
+
+环境要求（实测）：Windows x64、Node.js 22 或 24（本机 24.16.0，CI 用 22）、Python 3.12
+（本机 3.12.10）。仓库没有 `.nvmrc` / `.python-version`，以本节为准。
+
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+py -3.12 -m venv .venv          # 本机裸 python 不在 PATH，用 py 或写全路径
+.\.venv\Scripts\python.exe -m pip install -r backend\requirements-dev.txt
 npm install
 node node_modules/esbuild/install.js
 node node_modules/electron/install.js
@@ -202,17 +205,25 @@ npm run dev
 ```powershell
 npm run dist     # 前端 + 后端exe + NSIS 安装包 → release\
 ```
-或分步：
+`dist` 串了三步：`build:renderer` → `build:backend`（PyInstaller）→ `build:installer`。
+最后一步前先跑 `node scripts/check_backend_fresh.mjs`：只要 `backend_dist` 里的 exe 比任何
+后端源码旧，就直接失败。**别绕过它单独 `npx electron-builder`** —— 那会把上周打好的后端
+原封不动装进新版本安装程序：版本号是新的、后端是旧的、而且一声不响（本机真出现过
+0.5.6 界面配 0.5.1 后端）。确实要分步，顺序必须是：
+
 ```powershell
 npm run build:renderer
-powershell -ExecutionPolicy Bypass -File scripts\build_backend.ps1
-npx electron-builder --win nsis
+npm run build:backend        # 重新打后端，不要复用 backend_dist 里的旧 exe
+npm run build:installer      # 内含新鲜度闸门
 ```
 
 ## 自动构建（GitHub Actions）
 
-`.github/workflows/build.yml` 在 `windows-latest` 上依次执行
-pytest → 前端 typecheck/构建 → PyInstaller 后端 → electron-builder NSIS，提供两条路径：
+`.github/workflows/build.yml` 在 `windows-latest` 上的顺序是：`npm ci` → 更新链路单测
+（`npm test`）→ 装 Python 依赖 → 版本号一致性 → 后端 pytest → 前端 typecheck+构建 →
+PyInstaller 后端 → **后端 exe 新鲜度闸门** → electron-builder NSIS → **产物三件套断言**
+（exe / blockmap / latest.yml 必须齐，且 latest.yml 声明的版本、path、体积与真实 exe 一致）
+→ 上传 artifact。提供两条路径：
 
 - **发版**：推送 `v*` 形式的 tag，构建成功后安装包自动附到对应 Release。
   资产名固定为 ASCII 的 `DiskCleanup-Setup-<version>.exe`，与软件内 electron-updater
@@ -220,8 +231,9 @@ pytest → 前端 typecheck/构建 → PyInstaller 后端 → electron-builder N
 - **验证**：在 Actions 页手动触发 `workflow_dispatch`，只产出 artifact 供下载试用，
   不触碰 Release。
 
-打包步骤显式带 `--publish never`，避免 electron-builder 在 tag 构建时误用
-`package.json` 里指向 `example.com` 的 publish 占位配置。
+打包步骤显式带 `--publish never`（Release 由后面的 `action-gh-release` 上传），避免
+electron-builder 自己按 publish 配置去推。`package.json` 里那条 `gh-proxy.com` 地址是软件内
+electron-updater 读 `latest.yml` 的更新源，不是占位符，别删。
 
 构建前执行 `python scripts/check_versions.py` 校验 7 处版本号是否一致；tag 构建还会
 校验 tag 与代码版本是否匹配，不一致直接中断。本地发版前可用 `npm run check:versions` 自查。
@@ -255,13 +267,81 @@ pytest → 前端 typecheck/构建 → PyInstaller 后端 → electron-builder N
 开发模式只会显示"开发模式下不检查更新"。更新链路的真实验收只能在打包产物上做。
 
 ## 测试
+
+发版门禁 = 下面全绿（当前实测：后端 85 项、更新链路 13 项、typecheck 与生产构建通过）。
+
 ```powershell
-.\.venv\Scripts\python.exe -m pytest backend/tests -q     # 后端 42 个用例
-npm run typecheck                                          # 前端类型检查
-npm run build:renderer                                     # 前端生产构建
-python scripts/check_versions.py                           # 版本号一致性自检（发版前）
-python scripts/smoke_packaged.py                           # 打包后端 exe 健康检查
+npm run test:all                 # 更新链路单测 + 后端 85 项（含越权守卫与加固回归）
+npm run test:e2e                 # 真实 Electron 冒烟：10 项断言，接口全打桩，不碰真盘
+node scripts/e2e-smoke.mjs --block-ai   # 同上，改走"AI 配置读取失败"的错误路径
+npm run typecheck                # 前端类型检查
+npm run build:renderer           # 前端生产构建
+npm run check:versions           # 版本号一致性自检（发版前，7 处落点）
 ```
+
+`test:backend` 与 `check:versions` 走 `.venv\Scripts\python.exe`（本机裸 `python` 不在
+PATH）；CI 由 `setup-python` 提供解释器，直接调 `python`。
+`scripts/e2e-smoke.mjs` 拦掉全部 `/api/**` 用桩数据跑，`scripts/smoke_packaged.py` 只做
+健康检查 —— 两者都不会真的扫描、删除或卸载任何东西。
+## 目录结构与数据流（接手先看这里）
+
+```
+electron/                 主进程
+  main.js                 起后端 → 建窗口 → 装配更新器 → 退出收尾
+  backend_runner.js       选端口、拉起后端 exe、健康等待、stderr 落盘
+  feeds.js               更新渠道 + latest.yml 解析 + Release 正文降级纯文本（可单测）
+  update_probe.js         渠道测速：探 latest.yml 拿资产名 → 对安装包做 Range 采样
+src/                      React 渲染层（Vite 打包 → dist/）
+  api/client.ts           唯一后端出口：鉴权头、超时、下载型端点
+  store/                  ScanContext（扫描状态机）/ updater（更新状态机）/ settings / ToastContext
+  components/             面板；DataTable.tsx 是虚拟滚动网格外壳（列模板与 CSS 两处同步）
+backend/                  FastAPI 后端（PyInstaller 打成单 exe）
+  main.py                 装载路由、本地 token 中间件、lifespan
+  platform.py             工具发现与路由装载（装出 0 条路由会直接抛错）
+  core/scanner.py         扫描 + 会话 SQLite(WAL) + 删除前溯源 + 保留清理
+  core/secure_store.py    DPAPI 封装，AI Key 不落明文
+  api/routes_*.py         11 个前缀 / 29 个端点
+  tests/                  pytest（越权守卫 + 加固回归）
+scripts/                  构建、版本自检、后端打包、冒烟与 E2E
+```
+
+数据流：渲染层 `fetch http://127.0.0.1:<随机端口>` 带 `X-DCA-Token` 头 → FastAPI 路由 →
+`core` 业务模块 → 会话 SQLite。主进程与渲染层只通过 preload 暴露的 `window.dca` 通信。
+**进程职责**：后端只做机制（扫描/分类/删除/审计），一切"用户是否确认"的判断在界面；
+删除白名单由后端裁决（只有扫描在册且未锁定的路径才允许删），不依赖界面诚实。
+
+## 运行时数据位置
+
+`%APPDATA%\disk-cleanup-assistant\`
+
+| 文件 | 作用 |
+|---|---|
+| `scans/<12位hex>.db`（含 `-wal`/`-shm`） | 一次扫描一个库；启动时回收 7 天前的与孤儿 sidecar |
+| `ai_config.json` | AI 配置；Key 以 `dpapi:` 前缀存 Windows 用户级密文 |
+| `deletion_log.jsonl` | 删除审计，界面「删除日志」与 CSV 导出的数据源 |
+| `backend_stderr.log` | 后端 traceback，排查 500 从这里看 |
+
+卸载**不会**删这个目录（`deleteAppDataOnUninstall: false`）——清理记录属于用户资产。
+环境变量：`DCA_API_TOKEN`（主进程注入；单独跑后端时为空＝不鉴权）、
+`DISK_CLEANUP_LOG_DIR`（测试/排障改数据目录）、`ELECTRON_START_URL`（dev 指向 vite）；
+签名相关见 `.env.example`。
+
+## FAQ（真踩过的）
+
+- **点「更新并重启」没升级？** 更新安装只认静默参数（`quitAndInstall(true, true)`）；
+  若弹出让点「下一步」的安装向导，等于没升级。开发模式恒不检查更新，更新链路只能在
+  打包产物上验收。
+- **界面一片空白 / 每个面板都空？** 先看 `/api/health` 的 `routers` 与 `load_errors`
+  （正常 29 / 0）。工具路由装载失败会直接启动报错，不再"200 但没接口"。
+- **后端报 500 怎么查？** 看 `%APPDATA%\disk-cleanup-assistant\backend_stderr.log`
+  （dev 下后端不再丢弃 traceback）。
+- **装完还是旧版本？** 检查是否装到了旧安装包：`release\` 里可能留着历史产物。
+  本地重新出包只认 `npm run dist`，它会先重打后端并做新鲜度闸门。
+- **安装程序提示"未知发布者"？** 当前 CI 不做代码签名，需要正规 OV/EV 证书或
+  Azure Trusted Signing，见下一节；自签证书只能本地测试用。
+- **更新为什么走 `gh-proxy.com`？** 直连 `github.com` 在部分网络下不可用；更新源与
+  下载页链接都带镜像，且会在多个渠道间测速择优。
+
 ## 代码签名（Windows 分发）
 
 > 说明：让 SmartScreen 不再弹“未知发布者”，必须使用正规 CA 的**代码签名证书**（OV/EV）。

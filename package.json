@@ -13,17 +13,20 @@
     "typecheck": "tsc --noEmit",
     "build:renderer": "tsc --noEmit && vite build",
     "build:backend": "powershell -ExecutionPolicy Bypass -File scripts\\build_backend.ps1",
-    "dist": "npm run build:renderer && npm run build:backend && electron-builder --win nsis",
+    "dist": "npm run build:renderer && npm run build:backend && npm run build:installer",
     "sign": "powershell -ExecutionPolicy Bypass -File scripts\\sign.ps1",
     "gen:dev-cert": "powershell -ExecutionPolicy Bypass -File scripts\\generate_dev_cert.ps1",
-    "dist:azure": "npm run build:renderer && npm run build:backend && node scripts/prepare-azure-config.mjs && electron-builder --win nsis --config build/azure-config.json",
+    "dist:azure": "npm run build:renderer && npm run build:backend && npm run build:installer -- --config build/azure-config.json",
     "verify:azure-env": "node scripts/prepare-azure-config.mjs",
-    "check:versions": "python scripts/check_versions.py"
+    "check:versions": ".venv\\Scripts\\python.exe scripts/check_versions.py",
+    "test": "node --test electron/feeds.test.mjs",
+    "test:backend": ".venv\\Scripts\\python.exe -m pytest backend/tests -q",
+    "test:e2e": "node scripts/e2e-smoke.mjs",
+    "test:all": "npm run test && npm run test:backend",
+    "build:installer": "node scripts/check_backend_fresh.mjs && electron-builder --win nsis --publish never"
   },
   "dependencies": {
-    "electron-updater": "^6.8.9",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "electron-updater": "^6.8.10"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",
@@ -32,8 +35,10 @@
     "concurrently": "^9.0.1",
     "cross-env": "^7.0.3",
     "electron": "^33.0.0",
-    "electron-builder": "^25.1.8",
+    "electron-builder": "^26.15.3",
     "playwright-core": "^1.63.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "typescript": "^5.6.3",
     "vite": "^6.0.1"
   },
@@ -63,7 +68,6 @@
       "target": [
         "nsis"
       ],
-      "publisherName": "local-tools",
       "artifactName": "DiskCleanup-Setup-${version}.${ext}",
       "icon": "build/icons/icon.ico"
     },

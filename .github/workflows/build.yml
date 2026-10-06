@@ -9,7 +9,13 @@ on:
 permissions:
   contents: write
 
+# 同一分支/标签上后推的构建会取代前一个，避免两条流水线抢同一个 release 资产
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
+  # 与本机开发环境的差异要在 CI 里先暴露，不要等到用户机器上才发现
   NODE_VERSION: "22"
   PYTHON_VERSION: "3.12"
   PYTHONIOENCODING: "utf-8"
@@ -29,7 +35,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-          cache-dependency-path: backend/requirements.txt
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
 
       - name: Set up Node
         uses: actions/setup-node@v7
@@ -37,8 +45,15 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
+      # 依赖装完就跑各自的单测：JS 侧失败没必要再花 10 分钟打后端 exe
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Run updater unit tests
+        run: npm test
+
       - name: Install Python dependencies
-        run: pip install -r backend/requirements.txt
+        run: pip install -r backend/requirements-dev.txt
 
       - name: Check version consistency
         run: python scripts/check_versions.py
@@ -49,9 +64,6 @@ jobs:
 
       - name: Run backend tests
         run: python -m pytest backend/tests -q
-
-      - name: Install Node dependencies
-        run: npm ci
 
       - name: Read app version
         id: app
@@ -66,17 +78,42 @@ jobs:
       - name: Build backend exe (PyInstaller)
         run: npm run build:backend
 
+      # 防止把旧的后端 exe 装进新版本安装程序（本机真出现过 0.5.6 界面配 0.5.1 后端）
+      - name: Check backend exe freshness
+        run: node scripts/check_backend_fresh.mjs
+
       - name: Package installer (electron-builder NSIS)
-        run: npx electron-builder --win nsis --publish never
+        run: npm run build:installer
 
-      - name: List build output
-        run: dir release
+      # 更新器只认 latest.yml 里那一个资产：三件少任何一件，
+      # 要么用户收到更新却下载失败，要么根本收不到更新。缺件必须让流水线红。
+      - name: Verify release artifacts
+        shell: pwsh
+        run: |
+          $v = "${{ steps.app.outputs.version }}"
+          $needed = @(
+            "release/DiskCleanup-Setup-$v.exe",
+            "release/DiskCleanup-Setup-$v.exe.blockmap",
+            "release/latest.yml"
+          )
+          $missing = $needed | Where-Object { -not (Test-Path $_) }
+          if ($missing) { "缺少产物:`n$missing"; exit 1 }
+          $yml = Get-Content release/latest.yml -Raw
+          if ($yml -notmatch "version:\s*$([regex]::Escape($v))") { "latest.yml 版本与 $v 不符"; exit 1 }
+          if ($yml -notmatch "path:\s*DiskCleanup-Setup-$([regex]::Escape($v))\.exe") { "latest.yml path 不符"; exit 1 }
+          $exe = (Get-Item "release/DiskCleanup-Setup-$v.exe").Length
+          $declared = [int](($yml | Select-String -Pattern "size:\s*(\d+)" -AllMatches).Matches[0].Groups[1].Value)
+          if ($exe -ne $declared) { "latest.yml 声明体积 $declared != 实际 $exe"; exit 1 }
+          "产物齐备: DiskCleanup-Setup-$v.exe ($exe B) + blockmap + latest.yml"
 
-      - name: Upload installer artifact
+      - name: Upload build artifact
         uses: actions/upload-artifact@v7
         with:
-          name: LocalToolbox-Setup-${{ steps.app.outputs.version }}
-          path: release/*.exe
+          name: DiskCleanup-Setup-${{ steps.app.outputs.version }}
+          path: |
+            release/DiskCleanup-Setup-*.exe
+            release/DiskCleanup-Setup-*.exe.blockmap
+            release/latest.yml
           if-no-files-found: error
           retention-days: 14
 

@@ -1,7 +1,11 @@
-﻿fastapi>=0.111.0
-uvicorn[standard]>=0.30.0
-pydantic>=2.5.0
-send2trash>=1.8.3
-pytest>=8.0.0
-httpx>=0.27.0   # TestClient 依赖
-pyinstaller>=6.6.0
+# Runtime deps packed into disk_cleanup_backend.exe. Pinned exactly on purpose:
+# with ">=" ranges every CI run may resolve a different version, and a future
+# FastAPI major (removal of on_event etc.) would turn into an import-time crash
+# the user sees as a blank window. Versions come from the local .venv (pip freeze).
+# Build/test tooling lives in requirements-dev.txt.
+# Comments kept ASCII-only: pip-audit / pip on a GBK locale can choke on
+# non-UTF8 requirement files.
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+pydantic==2.13.5
+Send2Trash==2.1.0

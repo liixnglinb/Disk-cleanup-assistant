@@ -1,0 +1,7 @@
+# Build/test tooling - NOT shipped inside the installer.
+# httpx is required by FastAPI's TestClient, so the test suite cannot run without it.
+# pyinstaller is used by scripts/build_backend.ps1 to produce the single-exe backend.
+-r requirements.txt
+pytest==9.1.1
+httpx==0.28.1
+pyinstaller==6.22.2
