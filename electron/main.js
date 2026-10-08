@@ -107,12 +107,15 @@ autoUpdater.on("update-downloaded", (info) => {
   // 若下载途中又发布了新版本，两者会不一致，记错会让后续同版本检查重复下载整个安装包。
   downloadedVersion = String((info && info.version) || downloadingVersion);
   downloadingVersion = null;
+  // 下载好的安装包绝对路径：点「更新并重启」时把安装向导交回给用户要用它。
+  downloadedFilePath = String((info && info.downloadedFile) || "");
   send("update:downloaded", { version: (info && info.version) || "" });
 });
 
 // 去重闸门：同一版本只自动下载一次（渲染层与主进程各会触发一次 update-available）
 let downloadingVersion = null;
 let downloadedVersion = null;
+let downloadedFilePath = "";
 
 autoUpdater.on("update-available", async (info) => {
   const v = String((info && info.version) || "");
@@ -271,7 +274,17 @@ ipcMain.handle("update:install", () => {
     // 先把后端收掉：安装器要替换 resources\backend\*.exe，python 占着文件会让
     // 安装半途失败。killBackendTree 是同步的，返回时端口已经释放。
     killBackendTree();
-    // 静默安装：不显示安装向导，装完自动拉起新版本，用户无需重新走安装流程
+    // 把安装向导交回给用户：detach 拉起下载好的 NSIS 安装包（本软件 oneClick=false，
+    // 拉起来就是带「下一步」的向导，装完 runAfterFinish 自动重开），再退出本进程。
+    // 顺序必须「先拉起、后退」：反过来进程一退出，spawn 的安装器会被一起收掉。
+    // 拿不到安装包路径时才退回静默安装，保证更新不会卡在最后一步。
+    if (downloadedFilePath && require("fs").existsSync(downloadedFilePath)) {
+      require("child_process")
+        .spawn(downloadedFilePath, [], { detached: true, stdio: "ignore" })
+        .unref();
+      setTimeout(() => app.quit(), 400);
+      return { ok: true };
+    }
     setImmediate(() => autoUpdater.quitAndInstall(true, true));
     return { ok: true };
   } catch (err) {

@@ -110,7 +110,7 @@ export default function UpdateBox() {
         title="是否现在更新并重启？"
         // 完整说明在胶囊的阅读面板里；确认框只留一条短摘要 —— 否则一个
         // "要不要重启"的是/非框会被撑成整屏高的文本墙，反而没人读。
-        body={"将安装 v" + state.latest + " 并立即重启软件。当前未保存的操作会丢失。"
+        body={"将关闭软件并打开 v" + state.latest + " 的安装程序，按提示点「下一步」即可完成安装；装好会自动重新打开。当前未保存的操作会丢失。"
           + (state.releaseNotes ? "\n\n" + state.releaseNotes.slice(0, 240) + (state.releaseNotes.length > 240 ? "…" : "") : "")}
         confirmText="更新并重启"
         onCancel={() => setAsking(false)}
