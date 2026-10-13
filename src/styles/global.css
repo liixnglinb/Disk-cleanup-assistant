@@ -1,102 +1,98 @@
 /* =============================================================================
-   本地工具箱 · 设计系统 v9
+   本地工具箱 · 设计系统 v10（深空工作台 / Deep Desk）
    -----------------------------------------------------------------------------
-   本版按《UI/UX 重构方案（二）》的「设计 Tokens 规范」重写，色值与字号刻度
-   完全照搬方案文本，包括方案给出的语义色与暗色底色。
+   v9 是「现代卡片风」：靛蓝主色 + 面板渐变 + 顶部内高光。v10 按 Voyra 套件
+   设计语言整体换血，配色与几何以 Tibo AI 控制台为参照：
+     近黑中性画布、发丝线卡片、白/黑对偶主按钮、下划线 Tab、页头四要素。
 
-   与 v8 的差异（有意为之，不是回归）：
+   与 v9 的差异（有意为之，不是回归）：
 
-   1. 色板整体换血。Light 底 #F9F9F9 / 面板 #FFFFFF；Dark 底 #121212 / 面板
-      #1E1E1E。v8 用过 #EFEFED（暖灰）与 #101114，方案要求的是中性灰。
-   2. 语义色改用方案指定的亮色系：Primary #6366F1、Ok #10B981、Warn #F59E0B、
-      Danger #EF4444。
+   1. 色板去彩色化。主色从靛蓝 #6366F1 改为**中性对偶**：
+      浅色工作台用墨黑主按钮（#18181B 底 + 白字 15.9:1），
+      深色工作台用纸白主按钮（#F4F4F5 底 + #141518 字 15.4:1）。
+      UI 里不再出现第五个色相 —— 颜色只留给 ok/warn/danger 三个语义色
+      与分类刻度线（低饱和墨色系），其余一律中性。这也是 Tibo 那类
+      控制台读起来"安静"的原因：主按钮不抢内容的注意力。
+   2. 去掉面板渐变与顶部内高光。--panel-grad 收敛为纯 surface，
+      --inset-hi 置空。层次改由 surface 色阶 + 1px 发丝线承担，
+      不再靠"亮一度的高光"制造材质感。
+   3. 新增 --canvas：内容画板底色。此前 .content 没有自己的背景，
+      标题栏 / 导航栏 / 内容区三者同色，"外壳 - 画板"两级深度只停留在
+      注释里。现在 shell 用 --bg、画板用 --canvas、浮层用 --bg-elevated，
+      三级色阶各自明确。
+   4. 边框改成 rgba 发丝线（深色 rgba(255,255,255,.08)），
+      v9 的实色 #2D2D2D 在 #121212 上偏"实心描边"，不是发丝线。
+   5. --text-dim 在两个主题都抬到 AA 4.5:1 以上（小字要能读）。
+   6. 删除无消费者的死令牌：--primary-grad / --primary-hover /
+      --toast-info-* / --user-msg-bg / --chat-bg / --purple-3 / --purple-4
+      / --scroll-track。grep 全 styles/ 与全部 TSX 确认零消费
+      （--scroll-track 也曾有消费，见下方滚动条处改为直接透明）。
 
-      ⚠ 已知取舍（用户 2026-10-03 明确裁定「完全照搬方案二数值」）：
-      #10B981 在 #FFFFFF 上对比度约 2.3:1、#F59E0B 约 2.0:1，均低于
-      WCAG AA 正文 4.5:1。因此语义色只可用于「色块 / 描边 / 图标」，
-      不得单独承载小字号文字语义；文字标签一律搭配 --text / --text-body
-      或更深的中性色使用。v8 曾用 #0F7B52 / #9A6700 / #C93A34 满足 AA，
-      此处按方案回退，若日后出现可读性投诉，改这两处 + 下方暗色覆盖即可。
-
-   3. 字号收敛为方案定义的 7 档（--fs-xs … --fs-hero）。v8 的 17 种碎片字号
-      （11 / 11.5 / 12 / 12.5px 等）已全部归入本刻度。
-   4. 字重固定为 400 / 500 / 600 / 700。Windows 主力字体（微软雅黑、旧版
-      Segoe UI）只有 400 / 700 两档，非标准字重会被取整或合成伪粗体。
-      字体栈补上 Segoe UI Variable。
-   5. 深度策略统一为「表面色阶 + 1px 精准边框」，不混用边框 / 阴影 / 半透明。
-      暗色下阴影几乎不可见，层次由 surface 提亮与 border 承担。
-   6. 外壳尺寸按方案：标题栏 --titlebar-h 64px（v8 为 34px，与 Electron
-      titleBarOverlay.height 同步，见 electron/main.js）、导航 --nav-rail-w
-      120px 图标 + 常驻文字标签（方案二原定 48px 纯图标，2026-10-05 实测
-      悬停才出标签看不清去哪，故放宽；v8 为 168px）。
-
-   保留说明：--fs-2xl / --lh-* / --fw-* / --cat-* / --row-h / --head-h /
-   --field-h / --panel-grad / --inset-hi / --bg-elevated / --input-bg 等
-   并非方案新增，但现有组件仍在消费，删掉会导致掉样式，故予保留。
+   保留说明：--fs-2xl（扫描环中心数字）/ --lh-* / --fw-* / --cat-* /
+   --row-h / --head-h / --field-h / --nav-rail-w / --content-pad /
+   --update-capsule-reserve（UpdateBox.tsx 内联设置）仍在消费，保留。
    ===========================================================================*/
 :root {
   color-scheme: light;
 
-  /* ================= 背景色阶（页面底 → 面板 → 悬停 → 按下） ================= */
-  --bg: #F9F9F9;
-  --bg-elevated: #F4F4F4;
-  --surface: #FFFFFF;
-  --surface-hover: #F3F4F6;
-  --surface-active: #E5E7EB;
+  /* ================= 背景色阶：外壳 → 画板 → 浮层 → 面板 → 悬停 ================= */
+  --bg: #F0F0F2;          /* 外壳：标题栏 + 侧栏 */
+  --canvas: #F7F7F8;      /* 内容画板：比外壳亮一级，托出面板 */
+  --bg-elevated: #FFFFFF; /* 浮层：抽屉 / 弹窗 */
+  --surface: #FFFFFF;     /* 面板 / 卡片 */
+  --surface-hover: #F1F1F4;
+  --surface-active: #E8E8EC;
   --input-bg: #FFFFFF;
-  --border: #E5E5E5;
-  --border-strong: #D1D5DB;
+  --border: #E5E5E9;
+  --border-strong: #D2D2D8;
 
-  /* ================= 文字层级（四级） ================= */
-  --text: #111827;
-  --text-body: #374151;
-  --text-muted: #6B7280;
-  --text-dim: #9CA3AF;
+  /* ================= 文字层级（四级，全部 ≥ 4.5:1） ================= */
+  --text: #18181B;
+  --text-body: #3F3F46;
+  --text-muted: #63636B;
+  /* v9 用 #9CA3AF，压在 #F7F7F8 上只有 2.8:1 —— 路径、时间戳这类小字
+     直接读不清。压深到 #6B6B73（4.79:1）后仍明显弱于 --text-body。 */
+  --text-dim: #6B6B73;
 
-  /* ================= 主色 ================= */
-  --primary: #6366F1;
-  --primary-hover: #4F46E5;
-  --primary-soft: #EEF2FF;
-  /* 实心主色面（主 CTA / 选中勾选框）专用三色 —— 与 --primary 分开是有意的：
-     白字压在 #6366F1 上只有 4.47:1，差 0.03 不达 WCAG AA 4.5；压到 #4F46E5 才有
-     6.29:1。导航激活文字同理，#6366F1 落在 #EEF2FF 上只有 3.99:1。
-     需要"能承载文字的主色面"时一律用这三个，不要用 --primary 现拼。 */
-  --primary-cta: #4F46E5;
-  --primary-cta-hover: #4338CA;
+  /* ================= 主色（中性对偶：墨黑 CTA + 白字） =================
+     为什么要单独一套 --primary-cta / --on-primary-cta：
+     "能承载文字的主色面"要求 ≥ 4.5:1。墨黑 #18181B 配白字是 15.9:1，
+     而若拿 --primary 去铺实心底再压白字，任何一档灰都到不了。
+     需要实心主色面（主 CTA / 勾选框选中 / 分段选中）时一律用这三个。 */
+  --primary: #18181B;
+  --primary-soft: #EAEAEE;
+  --primary-cta: #18181B;
+  --primary-cta-hover: #000000;
   --on-primary-cta: #FFFFFF;
-  --primary-grad: linear-gradient(135deg, #818CF8 0%, #4F46E5 100%);
-  --accent: #6366F1;
-  --accent-soft: #EEF2FF;
+  /* 主色的中性同源扩展：给未来需要"比 --primary 弱一点的强调"用 */
+  --accent: #18181B;
+  --accent-soft: #EAEAEE;
 
-  /* ================= 语义色（与主色不同轴，可独立演进） ================= */
-  --ok: #10B981;
-  --ok-soft: #D1FAE5;
-  --warn: #F59E0B;
-  --warn-soft: #FEF3C7;
-  --danger: #EF4444;
-  --danger-hover: #DC2626;
-  --danger-soft: #FEE2E2;
-  /* #EF4444 直接当 13px 小字只有 3.76:1（白底）/ 3.42:1（#F4F4F4 底），
-     不达 AA 4.5。红色小字一律用 --danger-ink；--danger 留给描边与圆点。
-     实心红底另配一对：白字压 #EF4444 同样只有 3.76，压到 #DC2626 才 4.83。 */
+  /* ================= 语义色（与主色不同轴，可独立演进） =================
+     #10B981 在 #FFFFFF 上约 2.3:1、#F59E0B 约 2.0:1，均低于 WCAG AA
+     正文 4.5:1。因此语义色只可用于「色块 / 描边 / 图标」，不得单独承载
+     小字号文字；文字标签一律搭配 --text / --text-body 或更深的中性色。 */
+  --ok: #0E9F6E;
+  --ok-soft: #D9F2E7;
+  --warn: #B45309;
+  --warn-soft: #FBEBD0;
+  --danger: #DC2626;
+  --danger-hover: #B91C1C;
+  --danger-soft: #FBE3E3;
+  /* #EF4444 直接当 13px 小字只有 3.76:1（白底）。红色小字一律用 --danger-ink；
+     --danger 留给描边与圆点。实心红底另配一对：白字压 #DC2626 得 4.83:1。 */
   --danger-ink: #B91C1C;
   --danger-cta: #DC2626;
   --danger-cta-hover: #B91C1C;
   --on-danger-cta: #FFFFFF;
-  --info: #6366F1;
-  --info-soft: #EEF2FF;
-
-  /* ---- 辅助（主色扩展，供 Toast / 气泡等零散消费） ---- */
-  --purple-3: #A5B4FC;
-  --purple-4: #818CF8;
-  --toast-info-bg: #EEF2FF;
-  --toast-info-border: #C7D2FE;
-  --user-msg-bg: #EEF2FF;
-  --chat-bg: #F3F4F6;
+  /* info 与主色同源（中性）：套件 UI 里只有 ok/warn/danger 三个语义色，
+     再引入一个蓝会变成"第五个色相"，与去彩色化相抵。 */
+  --info: #3F3F46;
+  --info-soft: #EAEAEE;
 
   /* ================= 字体 ================= */
   /* Segoe UI Variable 是 Win11 的可变字体，字重过渡连续；旧系统回落到 Segoe UI，
-     中文落到微软雅黑 UI。--font-ui 与方案给出的 --font-sans 等价，
+     中文落到微软雅黑 UI。--font-ui 与 --font-sans 等价，
      保留两个名字是因为 components.css 里两处都在用。 */
   --font-sans: system-ui, -apple-system, "Segoe UI Variable", "Segoe UI", sans-serif;
   --font-ui: system-ui, -apple-system, "Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
@@ -133,9 +129,9 @@
   --space-7: 32px;
   --space-8: 40px;
 
-  /* ================= 圆角（控件 6 / 容器 9 / 面板 12 / 胶囊） ================= */
+  /* ================= 圆角（控件 6 / 小容器 8 / 面板 12 / 胶囊） ================= */
   --radius-sm: 6px;
-  --radius: 9px;
+  --radius: 8px;
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-full: 9999px;
@@ -150,73 +146,79 @@
   /* 标题栏 64px：必须与 electron/main.js 的 titleBarOverlay.height 一致，
      否则系统最小化/最大化/关闭三键会与内容错位。改动时两处同步。 */
   --titlebar-h: 64px;
-  --nav-rail-w: 120px;
+  /* v10：侧栏从 120px（图标 + 挤在一起的标签）放宽到 208px ——
+     Tibo 那类控制台的侧栏是"图标 + 完整文字 + 分组标题"的三段式，
+     120px 放不下分组标题，也放不下底部状态块的产品名与版本号。 */
+  --nav-rail-w: 208px;
   --content-pad: 24px;
   /* 密度基线：表格行 / 表头 / 输入控件 */
   --row-h: 24px;
   --head-h: 28px;
   --field-h: 32px;
 
-  /* ================= 材质（面板 = 色阶 + 顶部 1px 内高光） ================= */
-  --panel-grad: linear-gradient(180deg, #FFFFFF 0%, var(--surface) 100%);
-  --inset-hi: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  /* ================= 材质（v10：纯色面板，无渐变无内高光） ================= */
+  --panel-grad: var(--surface);
+  --inset-hi: none;
 
-  /* ================= 分类色（8 类，主题各一套） =================
-     暗色下需整体提亮，否则 #111111 一类的圆点在深底上不可见。 */
+  /* ================= 分类色（8 类，低饱和墨色系，主题各一套） =================
+     v9 的分类色照搬方案二，饱和度过高（#0550AE / #B45309 / #C1341B），
+     在满屏中性色里像三块彩色贴纸。v10 全部降饱和成"墨色"：
+     色相仍可辨（8 类要能区分），但不与内容争夺注意力。
+     暗色下需整体提亮，否则深底上看不见。 */
   --cat-system: #6B7280;
-  --cat-download: #0550AE;
-  --cat-cache: #B45309;
-  --cat-residue: #C1341B;
-  --cat-large: #111827;
-  --cat-docs: #1A7F37;
-  --cat-app-data: #6B46C1;
-  --cat-unknown: #9CA3AF;
+  --cat-download: #1E5F9E;
+  --cat-cache: #8A6116;
+  --cat-residue: #A33A24;
+  --cat-large: #3F3F46;
+  --cat-docs: #1F6B3A;
+  --cat-app-data: #5B4A9E;
+  --cat-unknown: #8E8E96;
 
-  /* ================= 阴影（仅用于浮层；卡片层次靠 surface + border） ================= */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.07);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --scroll-thumb: #D1D5DB;
-  --scroll-track: transparent;
-  --mask: rgba(17, 24, 39, 0.4);
+  /* ================= 阴影（v10：卡片不投影，层次靠 surface + 发丝线） =================
+     卡片阴影设为完全透明的零值而不是删掉声明：.panel / .bento-hero 等
+     box-shadow 仍是 `var(--inset-hi), var(--shadow-sm)` 的组合写法，
+     置空后语法仍合法，不必逐处改组件。
+     投影只留给"真正浮在内容之上"的东西：模态、抽屉、Toast、胶囊。 */
+  --shadow-sm: 0 0 0 0 transparent;
+  --shadow: 0 4px 14px 0 rgba(24, 24, 27, 0.1);
+  --shadow-lg: 0 12px 32px -8px rgba(24, 24, 27, 0.18), 0 2px 6px -2px rgba(24, 24, 27, 0.08);
+  --scroll-thumb: #CFCFD6;
+  --mask: rgba(24, 24, 27, 0.32);
 }
 
 /* =============================================================================
-   暗色：不是浅色的反转。底色抬高、正文降白以消除光晕（halation），
-   语义色提亮以保证在 #121212 上可辨。
+   暗色（v10 深空工作台）：不是浅色的反转。
+   近黑中性画布 #0B0B0E，面板提亮到 #14151A，发丝线用 rgba 白 8%；
+   主 CTA 走白/黑对偶而不是沿用浅色的墨黑 —— 深底上再铺一块深色实心面，
+   按钮会"消失"在背景里，必须反转为纸白底 + 深色字。
+   语义色提亮以保证在 #0E0E12 上可辨。
    ===========================================================================*/
 [data-theme="dark"] {
   color-scheme: dark;
-  --bg: #121212;
-  --bg-elevated: #1A1A1A;
-  --surface: #1E1E1E;
-  --surface-hover: #27272A;
-  --surface-active: #3F3F46;
-  --input-bg: #1E1E1E;
-  --border: #2D2D2D;
-  --border-strong: #3F3F46;
+  --bg: #0B0B0E;
+  --canvas: #0E0E12;
+  --bg-elevated: #14151A;
+  --surface: #14151A;
+  --surface-hover: #1C1E24;
+  --surface-active: #24262D;
+  --input-bg: #101216;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
 
-  --text: #F3F4F6;
-  --text-body: #E5E7EB;
-  --text-muted: #9CA3AF;
-  /* 方案给的是 #6B7280，在 #121212 上只有 4.1:1（AA 正文需 4.5:1）。
-     --text-dim 用于路径、元信息等小字，直接照搬会读不清，
-     这里上调到 #8A8F98（约 6.0:1）。语义层级不变，只是抬到可读线以上。
-     用户裁定"完全照搬方案二数值"，此处为唯一例外，理由是可访问性硬指标。 */
+  --text: #F4F4F5;
+  --text-body: #C9CACF;
+  --text-muted: #A0A2A9;
+  /* v9 已把 --text-dim 从 #6B7280 抬到 #8A8F98（约 6.0:1）。v10 画板
+     比 v9 更暗（#0E0E12 vs #121212），同一值对比度反而更好，保留 #8A8F98。 */
   --text-dim: #8A8F98;
 
-  --primary: #818CF8;
-  --primary-hover: #6366F1;
-  --primary-soft: rgba(99, 102, 241, 0.15);
-  /* 暗色下实心面要往"更亮 + 深色前景"走，而不是沿用浅色的深紫：
-     #818CF8 底 + #14151A 字 = 6.11:1；悬停再提亮到 #A5A0FF = 7.88:1。
-     若按浅色那套压深（#6366F1 底 + 深色字）只有 4.08:1，反而不达标。 */
-  --primary-cta: #818CF8;
-  --primary-cta-hover: #A5A0FF;
-  --on-primary-cta: #14151A;
-  --primary-grad: linear-gradient(135deg, #818CF8 0%, #4F46E5 100%);
-  --accent: #818CF8;
-  --accent-soft: rgba(99, 102, 241, 0.15);
+  --primary: #F4F4F5;
+  --primary-soft: rgba(255, 255, 255, 0.1);
+  --primary-cta: #F4F4F5;
+  --primary-cta-hover: #FFFFFF;
+  --on-primary-cta: #141518;
+  --accent: #F4F4F5;
+  --accent-soft: rgba(255, 255, 255, 0.1);
 
   --ok: #34D399;
   --ok-soft: rgba(16, 185, 129, 0.15);
@@ -225,40 +227,33 @@
   --danger: #F87171;
   --danger-hover: #EF4444;
   --danger-soft: rgba(239, 68, 68, 0.15);
-  /* 暗色的红色小字要提亮才够对比（#FCA5A5 压 #1E1E1E = 8.78:1）；
+  /* 暗色的红色小字要提亮才够对比（#FCA5A5 压 #14151A = 8.9:1）；
      但同一支提亮红不能当实心底 —— 白字压 #FCA5A5 只有 2.31:1。
      所以暗色的实心红反而压深到 #B91C1C，白字 6.47:1。 */
   --danger-ink: #FCA5A5;
   --danger-cta: #B91C1C;
   --danger-cta-hover: #991B1B;
   --on-danger-cta: #FFFFFF;
-  --info: #818CF8;
-  --info-soft: rgba(99, 102, 241, 0.15);
+  --info: #C9CACF;
+  --info-soft: rgba(255, 255, 255, 0.08);
 
-  /* 暗色下分类色整体提亮，保证圆点/文字在深底上可辨 */
+  /* 暗色下分类色整体提亮，保证圆点/刻度线在深底上可辨 */
   --cat-system: #9CA3AF;
-  --cat-download: #6FA8E8;
-  --cat-cache: #FBBF24;
-  --cat-residue: #F87171;
-  --cat-large: #E5E7EB;
-  --cat-docs: #34D399;
-  --cat-app-data: #A5B4FC;
-  --cat-unknown: #6B7280;
+  --cat-download: #6FA8DC;
+  --cat-cache: #D8A94E;
+  --cat-residue: #E0755C;
+  --cat-large: #D4D4D8;
+  --cat-docs: #5FBF85;
+  --cat-app-data: #A99BE0;
+  --cat-unknown: #7C7C85;
 
-  --purple-3: #A5B4FC;
-  --purple-4: #6366F1;
-  --toast-info-bg: rgba(99, 102, 241, 0.16);
-  --toast-info-border: rgba(99, 102, 241, 0.34);
-  --user-msg-bg: #23232F;
-  --chat-bg: #1A1A1A;
-
-  --panel-grad: linear-gradient(180deg, #232323 0%, var(--surface) 100%);
-  --inset-hi: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
-  --shadow: 0 4px 14px 0 rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
-  --scroll-thumb: #3F3F46;
-  --mask: rgba(0, 0, 0, 0.6);
+  --panel-grad: var(--surface);
+  --inset-hi: none;
+  --shadow-sm: 0 0 0 0 transparent;
+  --shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 16px 40px -8px rgba(0, 0, 0, 0.66), 0 2px 8px -2px rgba(0, 0, 0, 0.5);
+  --scroll-thumb: #2E3038;
+  --mask: rgba(0, 0, 0, 0.62);
 }
 
 * { box-sizing: border-box; }

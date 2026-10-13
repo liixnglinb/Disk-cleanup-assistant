@@ -11,20 +11,21 @@ const PROTOCOL = "local-toolbox";
 
 /**
  * 标题栏 overlay 的高度与配色 —— 必须与 src/styles/global.css 的
- * --titlebar-h / --bg / --text 保持一致。
+ * --titlebar-h / --bg / --text-body 保持一致。
  *
  * 为什么要在主进程再写一份：Electron 的 titleBarOverlay 由主进程设置，
  * 渲染进程无法直接改窗口 chrome；CSS 变量到不了这里。三处硬编码曾经各写各的
  * （标题栏 CSS 34px、overlay 34px、配色还是上一版暖灰），改成常量后至少
  * 本文件内不会再漂移。改标题栏高度时仍需同步 global.css 的 --titlebar-h。
  *
- * 配色取自设计系统 v9（方案二 Tokens）：浅色 #F9F9F9 / #111827，
- * 暗色 #121212 / #F3F4F6。
+ * 配色取自设计系统 v10（深空工作台）：外壳底色 --bg（浅 #F0F0F2 / 暗 #0B0B0E），
+ * 系统按钮取 --text-body（浅 #3F3F46 / 暗 #C9CACF）—— 按钮不是正文，
+ * 用 --text 那一档（近黑/近白）在各自的底上都过硬。
  */
 const OVERLAY = {
   height: 64,
-  light: { color: "#F9F9F9", symbol: "#111827", bg: "#F9F9F9" },
-  dark: { color: "#121212", symbol: "#F3F4F6", bg: "#121212" },
+  light: { color: "#F0F0F2", symbol: "#3F3F46", bg: "#F0F0F2" },
+  dark: { color: "#0B0B0E", symbol: "#C9CACF", bg: "#0B0B0E" },
 };
 
 let backendHandle = null;

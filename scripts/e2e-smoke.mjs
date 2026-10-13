@@ -29,7 +29,22 @@ const noise = [];
 const check = (name, ok, detail) =>
   results.push({ name, ok, detail: detail === undefined ? "" : String(detail) });
 
-const app = await electron.launch({ args: ["."], cwd: ROOT });
+// 本机排查记录（2026-10-13）：有些集成终端 / 工具链会往环境里注入 ELECTRON_RUN_AS_NODE=1
+// （WorkBuddy 的 shell 就有）。带着它启动 electron 会**当普通 Node 跑**：require("electron")
+// 拿到的是 npm 壳（一个路径字符串），electron-updater 的 ElectronAppAdapter 随即抛
+// `Cannot read properties of undefined (reading 'getVersion')`，看起来像代码坏了，
+// 实际是启动方式错了。playwright 的子进程会继承这里的 env，所以先摘掉它。
+delete process.env.ELECTRON_RUN_AS_NODE;
+
+// 沙箱 / 无桌面会话的环境（CI、VM、远程桌面）里 GPU 进程可能直接访问违例（0xC0000005）
+// 并 FATAL 退出，把整个应用带走。e2e 只关心界面与交互：禁 GPU 走软件合成，顺带关掉
+// 进程沙箱（被测应用本身不依赖沙箱提供任何保证）。在正常桌机上这些开关同样无害。
+// 需要别的组合时用 E2E_ELECTRON_ARGS="--foo --bar" 覆盖，不要改这里的默认值。
+const EXTRA_ARGS = process.env.E2E_ELECTRON_ARGS
+  ? process.env.E2E_ELECTRON_ARGS.split(/\s+/).filter(Boolean)
+  : ["--disable-gpu", "--no-sandbox", "--disable-gpu-sandbox"];
+
+const app = await electron.launch({ args: [".", ...EXTRA_ARGS], cwd: ROOT });
 const win = await app.firstWindow();
 win.on("pageerror", (e) => noise.push("[pageerror] " + e.message));
 win.on("console", (m) => {

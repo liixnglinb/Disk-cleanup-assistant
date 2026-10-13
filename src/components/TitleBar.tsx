@@ -1,13 +1,21 @@
 import React, { useEffect } from "react";
-import Icon from "./icons";
 import ScanControl from "./ScanControl";
-import { SECTIONS, useWorkspace } from "../store/workspace";
 import { useTheme } from "../hooks/useTheme";
 
+/**
+ * 标题栏：v10 退化为一条纯粹的窗口控制带。
+ *
+ * v9 这里是「品牌 + 扫描控制 + 三个抽屉/主题图标按钮」。v10 品牌与那三个
+ * 按钮全部搬进左侧三段式侧栏（品牌块 / 底部工具块），标题栏只剩两件事：
+ * 左侧全局扫描入口，中间整块可拖拽区，右侧让位给系统 overlay 按钮。
+ *
+ * 保留项说明：
+ *   - setTitleBarOverlay：系统按钮的前景/背景色由主进程画，必须跟着主题走；
+ *   - onDoubleClick：系统原生只处理 drag 区的双击最大化，按钮上的双击
+ *     会被 React 冒泡到这里，需要排除掉控件目标，否则点两下扫描按钮会弹最大化。
+ */
 export default function TitleBar() {
-  const { section, drawer, openDrawer } = useWorkspace();
-  const { theme, toggleTheme } = useTheme();
-  const label = SECTIONS.find((s) => s.key === section)?.label ?? "";
+  const { theme } = useTheme();
 
   useEffect(() => {
     window.dca?.setTitleBarOverlay?.(theme);
@@ -22,31 +30,8 @@ export default function TitleBar() {
 
   return (
     <header className="titlebar" onDoubleClick={onDoubleClick}>
-      <div className="titlebar-brand">
-        <span className="titlebar-logo"><Icon name="eraser" size={16} /></span>
-        <span className="titlebar-title">磁盘清理助手</span>
-        <span className="titlebar-sep" />
-        <span className="titlebar-section">{label}</span>
-      </div>
       <ScanControl />
       <div className="titlebar-drag" />
-      {/* 更新胶囊已移到右下角浮动（见 Shell），标题栏只留抽屉与主题 */}
-      <div className="titlebar-actions no-drag">
-        <button className={`icon-btn ${drawer === "kb" ? "on" : ""}`} aria-label="打开目录百科" title="目录百科" onClick={() => openDrawer("kb")}>
-          <Icon name="search" size={16} />
-        </button>
-        <button className={`icon-btn ${drawer === "logs" ? "on" : ""}`} aria-label="打开删除日志" title="删除日志" onClick={() => openDrawer("logs")}>
-          <Icon name="log" size={16} />
-        </button>
-        <button
-          className="icon-btn"
-          aria-label={theme === "dark" ? "切换到浅色主题" : "切换到深色主题"}
-          title={theme === "dark" ? "切换到浅色主题" : "切换到深色主题"}
-          onClick={toggleTheme}
-        >
-          <Icon name={theme === "dark" ? "sun" : "moon"} size={16} />
-        </button>
-      </div>
       <div className="titlebar-overlay-gap" />
     </header>
   );

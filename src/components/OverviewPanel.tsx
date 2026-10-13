@@ -76,9 +76,26 @@ export default function OverviewPanel({ onOpenFiles }: Props) {
 
   return (
     <div className="home">
+      {/* 页头四要素：标题 + 一句话定位 + 右侧全局动作。
+          v9 只有 hero 没有页头，"我在哪、这一页能干什么"要靠侧栏反推；
+          现在第一屏第一行就答完。右侧动作是全局的（浏览 / 重扫），
+          hero 里那对 CTA 才是主路径（清理推荐项）。 */}
+      <div className="page-head">
+        <div className="page-head-main">
+          <h2>磁盘概览</h2>
+          <p className="page-head-desc">扫描结果总览：可释放空间、分类占比与推荐清理项。</p>
+        </div>
+        <div className="page-head-actions">
+          <button className="btn ghost" onClick={() => onOpenFiles({})}>浏览全部文件</button>
+          <button className="btn primary" disabled={!selectedDrive || running} onClick={() => startScan(selectedDrive)}>
+            {running ? "正在扫描…" : statistics ? "重新扫描" : "开始扫描"}
+          </button>
+        </div>
+      </div>
+
       {!statistics && (
         <section className="home-section">
-          <div className="home-section-title"><h3>磁盘概览</h3></div>
+          <div className="home-section-title"><h3>磁盘占用</h3></div>
           {driveGrid}
         </section>
       )}
@@ -89,9 +106,6 @@ export default function OverviewPanel({ onOpenFiles }: Props) {
             <div className="es-icon"><Icon name="disk" size={28} /></div>
             <h3>还没有扫描过磁盘</h3>
             <p>扫描后会在这里展示可释放空间、分类统计与推荐清理的文件。</p>
-            <button className="btn primary" disabled={!selectedDrive || running} onClick={() => startScan(selectedDrive)}>
-              {running ? "正在扫描…" : "开始扫描"}
-            </button>
           </div>
         </section>
       )}
@@ -105,14 +119,6 @@ export default function OverviewPanel({ onOpenFiles }: Props) {
               <div className="skeleton" style={{ width: 300, height: 12, marginTop: 10 }} />
               <div className="skeleton" style={{ width: 210, height: 12, marginTop: 8 }} />
             </div>
-            <div className="hero-meta">
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <div className="skeleton" style={{ width: 72, height: 16 }} />
-                  <div className="skeleton" style={{ width: 56, height: 10 }} />
-                </div>
-              ))}
-            </div>
           </div>
           <div className="muted" style={{ fontSize: 12, marginTop: 10 }}>
             正在汇总上次扫描的分类统计…
@@ -122,6 +128,32 @@ export default function OverviewPanel({ onOpenFiles }: Props) {
 
       {statistics && (
         <>
+          {/* 统计卡行：四个并列指标独立成行。
+              v9 这四个数挤在 hero 右侧的 .hero-meta 里、最大 14px，
+              读不出"这是并列指标"；v10 上移为 20px 的统计带。 */}
+          <div className="stat-grid animate-in">
+            <div className="stat-card">
+              <span className="stat-label">已扫描文件</span>
+              <span className="stat-value">{statistics.total_files.toLocaleString()}</span>
+              <span className="stat-foot">占用 {formatBytes(totalBytes)}</span>
+            </div>
+            <div className="stat-card">
+              <span className="stat-label">可释放空间</span>
+              <span className="stat-value">{formatBytes(cleanable)}</span>
+              <span className="stat-foot">{cleanableCount.toLocaleString()} 个文件可安全清理</span>
+            </div>
+            <div className="stat-card">
+              <span className="stat-label">大文件 &gt;{settings.largeFileMb}MB</span>
+              <span className="stat-value">{formatBytes(largeBytes)}</span>
+              <span className="stat-foot">{largeCount.toLocaleString()} 个</span>
+            </div>
+            <div className="stat-card">
+              <span className="stat-label">残留 / 临时</span>
+              <span className="stat-value">{formatBytes(residueBytes)}</span>
+              <span className="stat-foot">{residueCount.toLocaleString()} 个</span>
+            </div>
+          </div>
+
           {/* Bento：Hero 占左侧 2/3，分类刻度线占右侧 1/3 纵列。
               非对称是刻意的 —— 概览只有一个"该做什么"的答案（清理推荐项），
               分类占比是辅助信息，不该与主行动争夺同等的视觉权重。 */}
@@ -143,17 +175,10 @@ export default function OverviewPanel({ onOpenFiles }: Props) {
                   <button className="btn primary" onClick={() => onOpenFiles({ recommendation: "recommend" })}>
                     <Icon name="eraser" size={14} /> 清理推荐项
                   </button>
-                  <button className="btn ghost" onClick={() => onOpenFiles({})}>浏览全部文件</button>
                 </div>
                 <span className="hero-note">
                   <Icon name="shield" size={12} /> 不会自动删除：这里只把「推荐删除」的文件筛出来给你逐个勾选
                 </span>
-              </div>
-              <div className="hero-meta">
-                <div><b className="num">{statistics.total_files.toLocaleString()}</b><span>已扫描文件</span></div>
-                <div><b className="num">{formatBytes(totalBytes)}</b><span>占用空间</span></div>
-                <div><b className="num">{largeCount.toLocaleString()}</b><span>大文件 &gt;{settings.largeFileMb}MB · {formatBytes(largeBytes)}</span></div>
-                <div><b className="num">{residueCount.toLocaleString()}</b><span>残留/临时 · {formatBytes(residueBytes)}</span></div>
               </div>
             </div>
 

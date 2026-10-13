@@ -149,6 +149,14 @@ export default function SettingsPanel() {
 
   return (
     <div className="tool settings">
+      {/* 页头四要素（v10）：标题 + 描述。设置页没有右侧全局动作 ——
+          所有可调项都在下面，页头只负责"我在哪、这一页管什么"。 */}
+      <div className="page-head">
+        <div className="page-head-main">
+          <h2>设置</h2>
+          <p className="page-head-desc">界面偏好、扫描参数与 AI 分析配置。</p>
+        </div>
+      </div>
       <div className="panel settings-body">
     <SectionTitle title="通用" desc="界面显示与交互偏好" />
     <Toggle

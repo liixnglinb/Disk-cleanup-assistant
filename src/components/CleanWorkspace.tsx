@@ -24,7 +24,16 @@ export default function CleanWorkspace({ onOpenKb }: Props) {
 
   return (
     <div className="tool">
-      <div className="cleanup-flow"><strong>先查看范围，再确认清理。</strong><ol aria-label="清理流程"><li>1 · 扫描与识别</li><li>2 · 选择项目</li><li>3 · 预览确认</li><li>4 · 查看报告</li></ol></div>
+      {/* 页头四要素：标题 + 描述 + Tab 行负责"当前来源"，右侧留给全局动作。
+          v9 这里先铺一张 cleanup-flow 流程条再进 Tab，第一屏是装饰性步骤说明；
+          v10 把步骤说明降级为 hero 的脚注（见 .hero-note 的同源文案），
+          第一行直接给标题和 Tab。 */}
+      <div className="page-head">
+        <div className="page-head-main">
+          <h2>清理</h2>
+          <p className="page-head-desc">扫描并安全删除缓存、大文件和重复文件。</p>
+        </div>
+      </div>
       <div className="seg-row" role="tablist" aria-label="清理来源">
         {CLEAN_SEGMENTS.map((s) => (
           <button

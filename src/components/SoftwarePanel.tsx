@@ -171,14 +171,19 @@ export default function SoftwarePanel() {
 
   return (
     <div className="animate-in">
-      <div className="panel">
-        <div className="tool-heading">
-          <h2><span className="tool-icon"><Icon name="package" size={22} /></span> 软件管理</h2>
+      {/* 页头四要素（v10）：标题 + 描述 + 右侧刷新动作。
+          v9 这两样塞在一张 .panel 卡片里，页面第一屏是"卡片里的一段说明"；
+          v10 之后页头脱离卡片，卡片留给真正的列表内容。 */}
+      <div className="page-head">
+        <div className="page-head-main">
+          <h2>软件</h2>
+          <p className="page-head-desc">读取注册表 Uninstall 列表，系统组件已自动排除；可直接启动官方卸载，卸载后可扫描残留。</p>
         </div>
-        <p className="muted" style={{ marginTop: 6 }}>
-          读取注册表 Uninstall 列表，系统组件已自动排除；可直接启动官方卸载，卸载后可扫描残留。
-        </p>
-
+        <div className="page-head-actions">
+          <button className="btn" onClick={load} disabled={loading}>刷新</button>
+        </div>
+      </div>
+      <div className="panel">
         {/* 搜索与筛选区 */}
         <div className="sw-toolbar">
           <div className="sw-search">

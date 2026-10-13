@@ -1,11 +1,15 @@
 /* =============================================================================
-   本地工具箱 · 组件样式 v5（现代卡片风 · 内容铺满）
+   本地工具箱 · 组件样式 v6（深空工作台 · 发丝线卡片 / 三段式侧栏 / 页头四要素）
    ===========================================================================*/
 
 /* ===== 应用骨架 ===== */
 .app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
-/* ---------------- 标题栏（自绘，与系统 overlay 同高） ---------------- */
+/* ---------------- 标题栏（v10：只留扫描控制，品牌搬到侧栏） ----------------
+   v9 标题栏左中右三段是「品牌 + 扫描控制 + 三个图标按钮」。品牌与三个抽屉
+   入口在 v10 全部移入左侧三段式侧栏后，标题栏退化为一条纯粹的窗口控制带：
+   左边是全局扫描入口（盘符 + 开始/暂停），中间是整块可拖拽区，右边让位
+   给系统 overlay 按钮。少挂一条信息，窗口 chrome 才安静得下来。 */
 .titlebar {
   height: var(--titlebar-h);
   display: flex; align-items: center; gap: var(--space-3);
@@ -20,18 +24,7 @@
 .titlebar button,
 .titlebar select,
 .titlebar input { -webkit-app-region: no-drag; }
-.titlebar-brand { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
-.titlebar-logo {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 28px; height: 28px; border-radius: var(--radius-sm);
-  background: var(--primary-soft); color: var(--primary);
-  flex: none;
-}
-.titlebar-title { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text); }
-.titlebar-sep { width: 1px; height: 14px; background: var(--border-strong); }
-.titlebar-section { font-size: var(--fs-sm); color: var(--text-muted); }
 .titlebar-drag { flex: 1 1 auto; height: 100%; }
-.titlebar-actions { display: flex; align-items: center; gap: 2px; }
 /* 给系统 overlay 按钮区留位。不要用 env(titlebar-area-width)：那个变量是"留给网页的
    区域宽度"（本机实测 ≈1144），不是按钮区宽度；一旦它真的解析出来会把内容挤爆。
    Windows 的系统按钮区恒为 ~138 CSS px：CSS px 就是 DIP，缩放比只改变物理像素，
@@ -50,55 +43,146 @@
   transition: width 0.3s var(--ease-out);
 }
 
-/* ---------------- 左侧导航栏（图标 + 常驻文字标签） ---------------- */
+/* ---------------- 左侧导航栏（v10 三段式：品牌 / 分组导航 / 底部工具） ----------------
+   为什么是 208px：三段式的第二段要放分组标题，第三段要放产品名与版本号，
+   120px 只够塞一个图标加两三个字。Tibo 那类控制台的侧栏本身就是"缩略的
+   产品说明书"，导航项图标 + 完整文字 + 分组标题三件套都在。 */
 .nav-rail {
   width: var(--nav-rail-w); flex: none;
   display: flex; flex-direction: column;
-  gap: 4px; padding: var(--space-3) 8px;
+  gap: var(--space-2); padding: var(--space-3);
   background: var(--bg);
   border-right: 1px solid var(--border);
 }
+
+/* 第一段：品牌块。固定不滚，给出"我在哪个软件里"的最强锚点。 */
+.rail-brand {
+  display: flex; align-items: center; gap: 10px;
+  padding: 4px 6px 12px; flex: none; min-width: 0;
+}
+.rail-logo {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: var(--radius-sm); flex: none;
+  background: var(--surface); border: 1px solid var(--border); color: var(--text);
+}
+.rail-brand-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.rail-brand-text b {
+  font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rail-brand-text em {
+  font-style: normal; font-size: var(--fs-xs); color: var(--text-dim);
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+}
+
+/* 分组标题：三段式的层级线索。小号常规字重 + 一字字距，不抢导航项。 */
+.rail-group-title {
+  display: block; padding: 0 10px; margin-bottom: 4px;
+  font-size: 10px; font-weight: var(--fw-medium); letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--text-dim);
+}
+/* 第二段：分组导航。flex:1 + min-height:0 让它吃掉剩余高度，
+   底部工具块才能稳定贴在侧栏底缘。 */
+.rail-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; min-height: 0; }
+/* 第三段：底部工具块。一条发丝线与导航分开，内容常驻。 */
+.rail-foot {
+  flex: none; display: flex; flex-direction: column; gap: 2px;
+  border-top: 1px solid var(--border); padding-top: var(--space-3);
+}
 .rail-item {
   position: relative;
-  width: 100%; height: 36px; border: 0; border-radius: var(--radius-sm);
+  width: 100%; height: 34px; border: 0; border-radius: var(--radius-sm);
   background: transparent; color: var(--text-muted); cursor: pointer;
-  display: flex; align-items: center; gap: 10px; padding: 0 12px;
-  font-family: var(--font-ui); font-size: var(--fs-md); font-weight: var(--fw-medium);
+  display: flex; align-items: center; gap: 10px; padding: 0 10px;
+  font-family: var(--font-ui); font-size: var(--fs-base); font-weight: var(--fw-medium);
   white-space: nowrap; text-align: left;
   transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
 .rail-item > svg { flex: none; }
 .rail-item:hover { background: var(--surface-hover); color: var(--text); }
-/* 激活态：底色 + 左侧 2px 指示条 + 加粗标签。
-   用 inset box-shadow 而不是 ::before 伪元素：伪元素会被按钮的 border-radius
-   裁切，且要额外处理 top/transform 对齐；阴影不参与布局也不会被圆角切掉。 */
+/* 激活态：面板色底 + 左侧 2px 指示条 + 加粗标签。
+   指示条用 --text（深色工作台是白、浅色是黑）而不是弱化色 —— 中性工作台里
+   没有色相可用，只能靠色阶 + 一根实心条。inset box-shadow 而不是 ::before：
+   伪元素会被按钮的 border-radius 裁切，阴影不参与布局也不会被圆角切掉。 */
 .rail-item.active {
-  background: var(--primary-soft); color: var(--primary-cta);
+  background: var(--surface); color: var(--text);
   font-weight: var(--fw-semibold);
-  box-shadow: inset 2px 0 0 var(--primary);
+  box-shadow: inset 2px 0 0 var(--text);
 }
+/* 抽屉开关的"已打开"态：与导航激活同源但更轻 —— 抽屉本身就说明了状态，
+   不需要再抢一次指示条。 */
+.rail-item.on { background: var(--surface); color: var(--text); }
 
 .workspace { flex: 1; display: flex; min-height: 0; position: relative; }
 
+/* 内容画板：自己的底色，比外壳（--bg）深/亮一级，托出上面的面板。
+   v9 这里没有 background 声明，标题栏 / 侧栏 / 内容区三者同色，
+   "外壳 - 画板"两级深度只停留在注释里。 */
 .content {
   flex: 1; overflow: auto; padding: var(--content-pad);
   display: flex; flex-direction: column; min-width: 0;
+  background: var(--canvas);
 }
-/* 方案二：工作区背景用 surface，让标题栏/导航栏的 bg 色阶托在外层，
-   形成「外壳 - 画板」两级深度（此前内容区与外壳同色，边界只剩一条线）。 */
 .content > * { min-height: 0; }
 
+/* ---------------- 页头四要素（v10） ----------------
+   每个工作区的第一屏都从页头开始：标题 + 一句话描述 + 右侧主/次操作。
+   v9 只有 overview 有英雄位，其余三页直接铺内容，用户要靠侧栏才知道
+   "我在哪、这一页能干什么"。页头四要素把这四种信息固定在同一个位置。 */
+.page-head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: var(--space-5); flex-wrap: wrap;
+  margin: 0 0 var(--space-5);
+}
+.page-head-main { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.page-head-main h2 {
+  font-size: var(--fs-xl); font-weight: var(--fw-semibold);
+  letter-spacing: -0.02em; color: var(--text);
+}
+.page-head-desc { font-size: var(--fs-base); color: var(--text-muted); max-width: 62ch; }
+.page-head-actions { display: flex; align-items: center; gap: var(--space-2); flex: none; }
+@media (max-width: 720px) {
+  .page-head { align-items: stretch; }
+  .page-head-actions { width: 100%; }
+}
+
 /* ===== 通用面板 / 卡片 ===== */
+/* v10：面板是"发丝线卡片"—— 1px 边框 + 与画板一级之差的底色，
+   不投影、不加内高光、不加渐变。深度全部由色阶表达。 */
 .panel {
-  background: var(--panel-grad);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg); padding: 18px 20px; margin-bottom: 14px;
-  box-shadow: var(--inset-hi), var(--shadow-sm);
 }
 .panel h2 { font-size: var(--fs-lg); margin-bottom: 6px; }
 .panel > .muted, .panel > p { margin-top: 0; }
 .section-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 12px; }
 .section-title h3 { font-size: var(--fs-lg); }
+
+/* ---------------- 统计卡行（v10） ----------------
+   页头下方的一排小卡：标签 + 一个大数字 + 一行脚注。
+   替代 v9 的 .hero-meta 四宫格 —— 那套挤在英雄位右侧、数字最大 14px，
+   读不出"这是四个并列指标"。独立成行后数字升到 20px、标签 11px，
+   一眼是统计带而不是附属信息。 */
+.stat-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-3); margin-bottom: var(--space-4);
+}
+.stat-card {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.stat-card .stat-label {
+  font-size: var(--fs-xs); color: var(--text-muted); font-weight: var(--fw-medium);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.stat-card .stat-value {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xl); font-weight: var(--fw-semibold);
+  color: var(--text); letter-spacing: -0.02em; line-height: 1.1;
+}
+.stat-card .stat-foot { font-size: var(--fs-xs); color: var(--text-dim); }
 
 /* ===== 按钮 ===== */
 /* 控件高度基线 32px：此前 .btn 30 / .btn.small 26 / select 26 / .switch 21 /
@@ -147,14 +231,14 @@ input[type="number"]:focus-visible, input.search:focus-visible {
   outline: 2px solid var(--primary); outline-offset: 2px;
 }
 /* 下拉框自绘箭头：原生箭头在 Windows 上贴边且不受主题控制，看不出"这是个可点的下拉"。
-   data URI 里的颜色写死，所以暗色单独覆盖一条。 */
+   data URI 里的颜色写死，所以暗色单独覆盖一条。v10 换成 --text-muted 的同值。 */
 select {
   appearance: none; -webkit-appearance: none; padding-right: 30px; cursor: pointer;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2363636B' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right 10px center;
 }
 :root[data-theme="dark"] select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23A0A2A9' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 select:hover:not(:disabled) { border-color: var(--primary); }
 select:focus, input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
@@ -237,9 +321,11 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
 
 /* ===== 工具页内部（铺满） ===== */
 .tool { display: flex; flex-direction: column; gap: 16px; }
+/* 下划线 Tab 行之后第一块内容要留出呼吸：Tab 自带 margin-bottom:0，
+   间距统一由内容区给，避免两处叠加成 32px。 */
+.tool-body { display: flex; flex-direction: column; gap: 16px; margin-top: var(--space-5); }
 .tool-heading h2 { font-size: var(--fs-xl); display: flex; align-items: center; gap: 9px; letter-spacing: -0.02em; color: var(--text); }
 .tool-icon { display: inline-flex; color: var(--text-body); }
-.tool-body { display: flex; flex-direction: column; gap: 16px; }
 
 /* ===== 首页（铺满） ===== */
 .home { display: flex; flex-direction: column; gap: 22px; }
@@ -345,7 +431,7 @@ button.link:hover { text-decoration: underline; }
   color: var(--text-muted); font-size: var(--fs-xs); font-weight: var(--fw-semibold);
   border-bottom: 1px solid var(--border);
   /* 行从下方滚过时不能透出行内容 */
-  background: var(--bg);
+  background: var(--canvas);
 }
 .data-grid-head > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .data-grid-head .col-check { display: flex; align-items: center; gap: 6px; }
@@ -463,14 +549,14 @@ button.link:hover { text-decoration: underline; }
    整盘扫描时永远滚不到头 —— 见 FileTable.tsx 的 PAGE 注释。 */
 .list-pager {
   display: flex; align-items: center; justify-content: center; gap: 14px;
-  padding: 10px 16px; border-top: 1px solid var(--border); background: var(--bg);
+  padding: 10px 16px; border-top: 1px solid var(--border); background: var(--canvas);
 }
 .pager-pos { font-size: var(--fs-base); color: var(--text-body); font-variant-numeric: tabular-nums; }
 .pager-hint { color: var(--text-dim); font-size: var(--fs-sm); }
 
 .file-bottom-bar {
   display: flex; align-items: center; gap: 14px; padding: 12px 16px;
-  border-top: 1px solid var(--border); background: var(--bg);
+  border-top: 1px solid var(--border); background: var(--canvas);
   position: sticky; bottom: 0;
 }
 .file-bottom-bar .fbb-summary { font-size: var(--fs-base); color: var(--text-body); }
@@ -521,7 +607,7 @@ button.link:hover { text-decoration: underline; }
 .modal .modal-desc { color: var(--text-muted); font-size: var(--fs-base); margin: 0 0 20px; }
 .modal .modal-scroll {
   border: 1px solid var(--border); border-radius: var(--radius-sm);
-  background: var(--bg); max-height: 180px; overflow: auto; margin-bottom: 16px;
+  background: var(--canvas); max-height: 180px; overflow: auto; margin-bottom: 16px;
 }
 .modal .modal-file {
   display: flex; align-items: center; gap: 8px; padding: 7px 10px;
@@ -581,7 +667,7 @@ button.link:hover { text-decoration: underline; }
 .data-table { width: 100%; border-collapse: collapse; font-size: var(--fs-base); }
 .data-table th {
   text-align: left; padding: 9px 12px; color: var(--text-muted); font-size: var(--fs-xs); font-weight: var(--fw-semibold);
-  background: var(--bg); border-bottom: 1px solid var(--border); white-space: nowrap;
+  background: var(--surface-hover); border-bottom: 1px solid var(--border); white-space: nowrap;
 }
 .data-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); color: var(--text-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px; }
 .data-table tr:last-child td { border-bottom: 0; }
@@ -618,7 +704,7 @@ button.link:hover { text-decoration: underline; }
 }
 .ai-privacy {
   margin-top: 16px; padding: 12px 14px; border-radius: var(--radius-sm);
-  background: var(--bg); border: 1px solid var(--border);
+  background: var(--surface-hover); border: 1px solid var(--border);
   color: var(--text-muted); font-size: var(--fs-sm); line-height: 1.6;
 }
 
@@ -967,7 +1053,7 @@ button.link:hover { text-decoration: underline; }
    ===========================================================================*/
 /* 暗色驱动盘分段选中态的前景已并入 --on-primary-cta 令牌，不再单独硬编码 */
 [data-theme="dark"] .sw-icon {
-  color: #14151A;
+  color: var(--on-primary-cta);
 }
 
 /* ---------------- 浮动更新胶囊（右下角常驻，方案二阶段三） ----------------
@@ -1053,7 +1139,7 @@ button.link:hover { text-decoration: underline; }
   position: relative; overflow: hidden;
   display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-7);
   padding: 26px 28px; border: 1px solid var(--border); border-radius: var(--radius-lg);
-  background: var(--panel-grad); box-shadow: var(--inset-hi), var(--shadow-sm);
+  background: var(--surface);
 }
 /* 巨大半透明水印：用真实容量值做底纹，不引入额外装饰图形。
    必须绝对定位：作为 flex 子项时它会占满容器宽度，
@@ -1076,7 +1162,7 @@ button.link:hover { text-decoration: underline; }
 .bento-scan {
   display: flex; flex-direction: column;
   padding: 20px 20px 12px; border: 1px solid var(--border); border-radius: var(--radius-lg);
-  background: var(--panel-grad); box-shadow: var(--inset-hi);
+  background: var(--surface);
 }
 .bento-scan-title { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: var(--space-4); }
 .bento-scan-title h3 { font-size: var(--fs-md); }
@@ -1113,12 +1199,16 @@ button.link:hover { text-decoration: underline; }
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* ===== 概览英雄位（全应用唯一的焦点） ===== */
+/* ===== 概览英雄位（全应用唯一的焦点） =====
+   v10：英雄位只剩"一个焦点 + 一行小注 + 两个动作"。
+   v9 在这里右侧挂了 .hero-meta 四宫格（数字最大 14px），英雄位塞满之后
+   "可释放空间"这个焦点反而被稀释；四宫格 v10 上移为独立的统计卡行
+   （.stat-grid / .stat-card），数字升到 20px，两处各司其职。 */
 .hero {
   position: relative; overflow: hidden;
   display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-7);
   padding: 22px 24px; border: 1px solid var(--border); border-radius: var(--radius-lg);
-  background: var(--panel-grad); box-shadow: var(--inset-hi), var(--shadow-sm);
+  background: var(--surface);
 }
 .hero-main { position: relative; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .hero-label { font-size: var(--fs-sm); color: var(--text-muted); letter-spacing: 0.02em; }
@@ -1133,10 +1223,6 @@ button.link:hover { text-decoration: underline; }
 .hero-cta { display: flex; gap: var(--space-2); margin-top: var(--space-4); }
 .hero-note { display: inline-flex; align-items: center; gap: 5px; margin-top: 10px; font-size: var(--fs-xs); color: var(--text-dim); }
 .hero-note svg { color: var(--ok); flex-shrink: 0; }
-.hero-meta { position: relative; display: grid; grid-template-columns: repeat(2, minmax(120px, auto)); gap: 14px 26px; flex-shrink: 0; }
-.hero-meta > div { display: flex; flex-direction: column; gap: 2px; }
-.hero-meta b { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text); letter-spacing: -0.02em; }
-.hero-meta span { font-size: var(--fs-xs); color: var(--text-muted); }
 .hero-skel { display: flex; flex-direction: column; }
 /* Bento 两栏在窄窗口堆叠：Hero 仍在上，刻度线在下 */
 @media (max-width: 1180px) {
@@ -1146,23 +1232,37 @@ button.link:hover { text-decoration: underline; }
 @media (max-width: 1080px) {
   .hero { flex-direction: column; align-items: stretch; }
   .bento-hero { flex-direction: column; align-items: stretch; }
-  .hero-meta { grid-template-columns: repeat(4, minmax(90px, auto)); }
 }
 
 
-/* ===== 清理工作区的来源分段 ===== */
-.seg-row { display: flex; gap: 4px; padding: 3px; margin-bottom: 14px; width: max-content;
-  background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius); }
-/* 未激活的分段标签是可点控件，不该用承载元信息的 --text-muted 档
-   （#6B7280 压在 #F4F4F4 上只有 4.40:1）；改用 --text-body 后 9.37:1。 */
+/* ===== 清理工作区的来源分段（v10 下划线 Tab） =====
+   v9 是"胶囊分段控件"（外框 + 圆角底 + 投影），塞在内容流里像一颗独立的
+   控件，与页头脱节。v10 改成 Tibo 那类控制台的下划线 Tab：没有外框、
+   没有底色，用一根 2px 实线下划线表达"当前在哪一格"，下方一条发丝线
+   把 Tab 行与内容分开。这样 Tab 行就是页头的延伸，不是又一个控件。 */
+.seg-row {
+  display: flex; gap: var(--space-5); margin-bottom: 0;
+  border-bottom: 1px solid var(--border);
+}
 .seg-item {
-  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 14px;
-  border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-body);
+  position: relative;
+  display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 2px;
+  border: 0; border-radius: 0; background: transparent; color: var(--text-muted);
   font-family: var(--font-ui); font-size: var(--fs-base); font-weight: var(--fw-medium); cursor: pointer;
-  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+  transition: color var(--dur-fast) var(--ease-out);
 }
+.seg-item > svg { flex: none; }
 .seg-item:hover { color: var(--text); }
-.seg-item.active { background: var(--surface); color: var(--text); font-weight: var(--fw-semibold); box-shadow: var(--shadow-sm); }
+/* 激活态：下划线用 ::after 而非 border-bottom —— border 会参与布局，
+   激活时 Tab 行高度会跳 2px，光标位置跟着晃。 */
+.seg-item.active { color: var(--text); font-weight: var(--fw-semibold); }
+.seg-item.active::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+  background: var(--text); border-radius: 2px 2px 0 0;
+}
+.seg-item:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; border-radius: var(--radius-sm); }
+/* 窄窗口：Tab 间距收一档，五项以上也不会挤到截断 */
+@media (max-width: 720px) { .seg-row { gap: var(--space-4); } }
 
 /* ===== 右侧抽屉（删除日志 / 目录百科） ===== */
 .drawer-mask { position: fixed; inset: 0; z-index: 90; background: var(--mask); display: flex; justify-content: flex-end; }

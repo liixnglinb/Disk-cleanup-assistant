@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- ============================================================
+       磁盘清理助手 · 应用图标（Voyra 套件「深空工作台」图标语言）
+       ------------------------------------------------------------
+       语言：深色 squircle 底板 + 白色扁平几何 + 一枚 Voyra 金焦点。
+       构思：一个带缺口的白色圆环 = 磁盘的圆形意象，同时是"释放"的动势；
+       缺口朝右上，缺口里嵌一粒金 #E3B75C（套件焦点色），读作"从这里腾出
+       空间"；环内一条圆头横条是被释放出来的容量。
+       三件元素全是几何，无描边渐变、无弥散光晕、无 3D 材质 ——
+       在 16px 下仍能辨出"环 + 缺口一个亮点"。
+       源文件入库，改动图标请改这里后用 scripts/build_icons.py 重建。
+       ============================================================ -->
+  <defs>
+    <linearGradient id="plate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1C1F27"/>
+      <stop offset="1" stop-color="#0A0B0F"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#D6D8DE"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 底板：squircle（ rx ≈ 22.4% ，与套件其它图标同一曲率） -->
+  <rect x="0" y="0" width="1024" height="1024" rx="229" fill="url(#plate)"/>
+  <!-- 发丝内边缘：让底板在深色任务栏上仍有边界 -->
+  <rect x="1.5" y="1.5" width="1021" height="1021" rx="227.5" fill="none"
+        stroke="rgba(255,255,255,0.11)" stroke-width="3"/>
+
+  <!-- 缺口圆环：周长 2π×252 ≈ 1583。实线 1276 / 缺口 307 ≈ 70°。
+       rotate(90) 把缺口从默认的右侧推到右上 45°。 -->
+  <circle cx="512" cy="512" r="252" fill="none" stroke="url(#ring)" stroke-width="54"
+          stroke-linecap="round" stroke-dasharray="1276 307"
+          transform="rotate(90 512 512)"/>
+
+  <!-- Voyra 金焦点：嵌在缺口正中（45° 方向、半径 252 处） -->
+  <circle cx="690" cy="334" r="31" fill="#E3B75C"/>
+
+  <!-- 被释放出来的容量：一条圆头横条，收在环内 -->
+  <rect x="434" y="489" width="156" height="46" rx="23" fill="#FFFFFF"/>
+</svg>
